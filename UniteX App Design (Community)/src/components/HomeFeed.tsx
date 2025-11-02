@@ -1,7 +1,14 @@
-import { Settings } from "lucide-react";
+import React, { useState } from "react";
+import { Settings, Plus } from "lucide-react";
 import PostCard from "./PostCard";
 import ProfileMenu from "./ProfileMenu";
+import { CreatePost } from "./CreatePost";
+import { useAuth } from "../contexts/AuthContext";
+import { usePosts, usePersonalizedFeed } from "../hooks/usePosts";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { Button } from "./ui/button";
+import { Card, CardContent } from "./ui/card";
+import { Dialog, DialogContent, DialogTrigger } from "./ui/dialog";
 import { motion } from "motion/react";
 
 const mockPosts = [
@@ -81,10 +88,14 @@ export default function HomeFeed({
   onNavigateToBookmarks,
   onNavigateToMessages 
 }: HomeFeedProps) {
-  const currentUser = {
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alex",
-    name: "Alex Johnson",
-  };
+  const { profile, signOut } = useAuth();
+  const [showCreatePost, setShowCreatePost] = useState(false);
+  
+  const { data: posts, isLoading: postsLoading } = usePosts();
+  const { data: personalizedFeed, isLoading: feedLoading } = usePersonalizedFeed();
+  
+  const currentPosts = personalizedFeed || posts || [];
+  const isLoading = feedLoading || postsLoading;
 
   return (
     <div className="min-h-screen bg-background pb-20 max-w-md mx-auto">
@@ -99,9 +110,9 @@ export default function HomeFeed({
           >
             <button className="p-0">
               <Avatar className="w-8 h-8">
-                <AvatarImage src={currentUser.avatar} />
+                <AvatarImage src={profile?.avatar_url || `https://ui-avatars.com/api/?name=${profile?.full_name}&background=3b82f6&color=fff`} />
                 <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black text-sm">
-                  {currentUser.name.charAt(0)}
+                  {profile?.full_name?.charAt(0) || 'U'}
                 </AvatarFallback>
               </Avatar>
             </button>
@@ -113,9 +124,22 @@ export default function HomeFeed({
             </div>
           </div>
 
-          <button onClick={onNavigateToSettings}>
-            <Settings className="w-6 h-6 dark:text-zinc-400 light:text-gray-600" />
-          </button>
+          <div className="flex items-center gap-2">
+            <Dialog open={showCreatePost} onOpenChange={setShowCreatePost}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <Plus className="w-5 h-5" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <CreatePost onClose={() => setShowCreatePost(false)} />
+              </DialogContent>
+            </Dialog>
+            
+            <button onClick={onNavigateToSettings}>
+              <Settings className="w-6 h-6 dark:text-zinc-400 light:text-gray-600" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -124,17 +148,56 @@ export default function HomeFeed({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.3 }}
+        className="px-4"
       >
-        {mockPosts.map((post, index) => (
-          <motion.div
-            key={post.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-          >
-            <PostCard {...post} />
-          </motion.div>
-        ))}
+        {isLoading ? (
+          <div className="space-y-4 mt-4">
+            {[1, 2, 3].map((i) => (
+              <Card key={i} className="dark:bg-zinc-900 dark:border-zinc-800">
+                <CardContent className="p-4">
+                  <div className="animate-pulse">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 bg-zinc-700 rounded-full"></div>
+                      <div className="space-y-2">
+                        <div className="h-4 bg-zinc-700 rounded w-32"></div>
+                        <div className="h-3 bg-zinc-700 rounded w-24"></div>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="h-4 bg-zinc-700 rounded w-full"></div>
+                      <div className="h-4 bg-zinc-700 rounded w-3/4"></div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : currentPosts && currentPosts.length > 0 ? (
+          currentPosts.map((post: any, index: number) => (
+            <motion.div
+              key={post.id || post.post_id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+            >
+              <PostCard post={post} />
+            </motion.div>
+          ))
+        ) : (
+          <Card className="dark:bg-zinc-900 dark:border-zinc-800 mt-4">
+            <CardContent className="p-8 text-center">
+              <div className="text-6xl mb-4">📝</div>
+              <h3 className="dark:text-white text-xl mb-2">No posts yet</h3>
+              <p className="dark:text-zinc-400 mb-4">
+                Be the first to share an idea or start a project!
+              </p>
+              <Button onClick={() => setShowCreatePost(true)}>
+                <Plus size={16} className="mr-2" />
+                Create Post
+              </Button>
+            </CardContent>
+          </Card>
+        )}
       </motion.div>
     </div>
   );

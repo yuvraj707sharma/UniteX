@@ -42,12 +42,15 @@ export default function App() {
   const [unreadNotifications, setUnreadNotifications] = useState(3);
   const [unreadMessages, setUnreadMessages] = useState(2);
   const [selectedUsername, setSelectedUsername] = useState("");
+  const [selectedProfileName, setSelectedProfileName] = useState("");
   const [followersTab, setFollowersTab] = useState<"followers" | "following">("followers");
+  const [previousScreen, setPreviousScreen] = useState<Screen>("home");
   const [preselectedChat, setPreselectedChat] = useState<{
     name: string;
     username: string;
     avatar: string;
   } | null>(null);
+  const [isInChatConversation, setIsInChatConversation] = useState(false);
 
   const handleLogin = () => {
     setIsLoggedIn(true);
@@ -89,13 +92,20 @@ export default function App() {
     }
   };
 
-  const handleNavigateToFollowers = (tab: "followers" | "following" = "followers") => {
+  const handleNavigateToFollowers = (tab: "followers" | "following" = "followers", username?: string, profileName?: string) => {
     try {
       if (tab !== "followers" && tab !== "following") {
         console.error('Invalid followers tab:', tab);
         return;
       }
       setFollowersTab(tab);
+      if (username) {
+        setSelectedUsername(username);
+      }
+      if (profileName) {
+        setSelectedProfileName(profileName);
+      }
+      setPreviousScreen(currentScreen);
       setCurrentScreen("followers");
     } catch (error) {
       console.error('Error navigating to followers:', error);
@@ -148,6 +158,7 @@ export default function App() {
             onNavigateToJobs={() => setCurrentScreen("jobs")}
             onNavigateToLists={() => setCurrentScreen("lists")}
             onNavigateToSpaces={() => setCurrentScreen("spaces")}
+            onNavigateToOtherProfile={handleNavigateToOtherProfile}
           />
         );
       case "project":
@@ -155,28 +166,42 @@ export default function App() {
       case "communities":
         return <Communities />;
       case "notifications":
-        return <Notifications />;
+        // Clear notifications when viewing
+        if (unreadNotifications > 0) {
+          setTimeout(() => setUnreadNotifications(0), 1000);
+        }
+        return <Notifications onNavigateToProfile={handleNavigateToOtherProfile} />;
       case "profile":
-        return <Profile onNavigateToFollowers={handleNavigateToFollowers} />;
+        return <Profile onNavigateToFollowers={(tab) => handleNavigateToFollowers(tab, "alexjohnson", "Alex Johnson")} />;
       case "otherProfile":
         return (
           <OtherProfile
             username={selectedUsername}
             onBack={() => setCurrentScreen("home")}
-            onNavigateToFollowers={() => handleNavigateToFollowers()}
+            onNavigateToFollowers={(username, profileName) => handleNavigateToFollowers("followers", username, profileName)}
             onNavigateToChat={handleNavigateToChat}
           />
         );
       case "followers":
         return (
           <FollowersList
-            onBack={() => setCurrentScreen("profile")}
+            onBack={() => setCurrentScreen(previousScreen)}
             onNavigateToProfile={handleNavigateToOtherProfile}
             initialTab={followersTab}
+            username={selectedUsername}
+            profileName={selectedProfileName}
           />
         );
       case "messages":
-        return <Messages initialChat={preselectedChat} />;
+        // Clear message notifications when viewing
+        if (unreadMessages > 0) {
+          setTimeout(() => setUnreadMessages(0), 1000);
+        }
+        return <Messages 
+          initialChat={preselectedChat} 
+          onClearUnread={() => setUnreadMessages(0)}
+          onChatStateChange={setIsInChatConversation}
+        />;
       case "settings":
         return <Settings onBack={() => setCurrentScreen("home")} />;
       case "bookmarks":
@@ -189,15 +214,6 @@ export default function App() {
         return <Lists onBack={() => setCurrentScreen("home")} />;
       case "spaces":
         return <Spaces onBack={() => setCurrentScreen("home")} />;
-      default:
-        return (
-          <HomeFeed
-            onNavigateToProfile={() => setCurrentScreen("profile")}
-            onNavigateToSettings={() => setCurrentScreen("settings")}
-            onNavigateToBookmarks={() => setCurrentScreen("bookmarks")}
-            onNavigateToMessages={() => setCurrentScreen("messages")}
-          />
-        );
       default:
         console.error('Unknown screen:', currentScreen);
         return (
@@ -249,8 +265,9 @@ export default function App() {
           </motion.div>
         </AnimatePresence>
 
-        {/* Bottom Navigation - Only show when logged in */}
+        {/* Bottom Navigation - Only show when logged in and not in chat */}
         {isLoggedIn && 
+          !isInChatConversation &&
           currentScreen !== "login" && 
           currentScreen !== "project" && 
           currentScreen !== "settings" && 

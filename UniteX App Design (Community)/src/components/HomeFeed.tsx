@@ -78,6 +78,7 @@ interface HomeFeedProps {
   onNavigateToJobs?: () => void;
   onNavigateToLists?: () => void;
   onNavigateToSpaces?: () => void;
+  onNavigateToOtherProfile?: (username: string) => void;
 }
 
 export default function HomeFeed({ 
@@ -87,7 +88,8 @@ export default function HomeFeed({
   onNavigateToMessages,
   onNavigateToJobs,
   onNavigateToLists,
-  onNavigateToSpaces
+  onNavigateToSpaces,
+  onNavigateToOtherProfile
 }: HomeFeedProps) {
   const currentUser = {
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alex",
@@ -150,7 +152,7 @@ export default function HomeFeed({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
           >
-            <PostCard {...post} />
+            <PostCard {...post} onNavigateToProfile={onNavigateToOtherProfile} />
           </motion.div>
         ))}
       </motion.div>

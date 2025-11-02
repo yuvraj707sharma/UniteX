@@ -3,8 +3,10 @@ import { Heart, MessageCircle, Share2, Bookmark, Send, Link2, Repeat2, Search } 
 import { motion } from "framer-motion";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
+import { Textarea } from "./ui/textarea";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +27,7 @@ interface PostCardProps {
   comments: number;
   shares: number;
   timeAgo: string;
+  onNavigateToProfile?: (username: string) => void;
 }
 
 export default function PostCard({
@@ -38,6 +41,7 @@ export default function PostCard({
   comments: initialComments,
   shares: initialShares,
   timeAgo,
+  onNavigateToProfile,
 }: PostCardProps) {
   const [liked, setLiked] = useState(false);
   const [likes, setLikes] = useState(initialLikes);
@@ -48,6 +52,8 @@ export default function PostCard({
   const [reposts, setReposts] = useState(Math.floor(Math.random() * 50));
   const [showCommentDialog, setShowCommentDialog] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const [showQuoteDialog, setShowQuoteDialog] = useState(false);
+  const [quoteText, setQuoteText] = useState("");
   const [shareSearchQuery, setShareSearchQuery] = useState("");
   const [commentText, setCommentText] = useState("");
   const [postComments, setPostComments] = useState([
@@ -182,33 +188,54 @@ export default function PostCard({
     toast.success(bookmarked ? "Removed from bookmarks" : "Added to bookmarks");
   };
 
+  const handleQuoteRepost = () => {
+    if (!quoteText.trim()) {
+      toast.error('Please add a comment to quote this post');
+      return;
+    }
+
+    if (containsMaliciousContent(quoteText)) {
+      toast.error('Comment contains invalid content');
+      return;
+    }
+
+    setReposts(reposts + 1);
+    setQuoteText("");
+    setShowQuoteDialog(false);
+    toast.success("Quote posted!");
+  };
+
   return (
     <div className="bg-background border-b dark:border-zinc-800 light:border-gray-200 px-4 py-4 dark:hover:bg-zinc-950 light:hover:bg-gray-50 transition-colors">
       <div className="flex gap-3">
         {/* Avatar */}
-        <Avatar className="w-12 h-12">
-          <AvatarImage src={avatar} />
-          <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black">
-            {author.charAt(0)}
-          </AvatarFallback>
-        </Avatar>
+        <button onClick={() => onNavigateToProfile?.(username)} className="text-left">
+          <Avatar className="w-12 h-12">
+            <AvatarImage src={avatar} />
+            <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black">
+              {author.charAt(0)}
+            </AvatarFallback>
+          </Avatar>
+        </button>
 
         {/* Content */}
         <div className="flex-1 min-w-0">
           {/* Header */}
           <div className="flex items-start justify-between mb-2">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-foreground truncate">{author}</span>
-                <Badge className="dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20 light:bg-red-50 light:text-red-600 light:border-red-200 text-xs rounded-full">
-                  {department}
-                </Badge>
-              </div>
-              <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                <span>@{username}</span>
-                <span>·</span>
-                <span>{timeAgo}</span>
-              </div>
+              <button onClick={() => onNavigateToProfile?.(username)} className="text-left block w-full">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-foreground truncate">{author}</span>
+                  <Badge className="dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20 light:bg-red-50 light:text-red-600 light:border-red-200 text-xs rounded-full">
+                    {department}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                  <span>@{username}</span>
+                  <span>·</span>
+                  <span>{timeAgo}</span>
+                </div>
+              </button>
             </div>
           </div>
 
@@ -236,24 +263,43 @@ export default function PostCard({
               <span className="text-sm">{comments}</span>
             </button>
 
-            <button
-              onClick={handleRepost}
-              className={`flex items-center gap-2 transition-colors group ${
-                reposted ? "text-green-500" : "hover:text-green-500"
-              }`}
-            >
-              <div className={`p-2 rounded-full transition-colors ${
-                reposted ? "bg-green-500/10" : "group-hover:bg-green-500/10"
-              }`}>
-                <motion.div
-                  animate={{ scale: reposted ? [1, 1.2, 1] : 1 }}
-                  transition={{ duration: 0.3 }}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={`flex items-center gap-2 transition-colors group ${
+                    reposted ? "text-green-500" : "hover:text-green-500"
+                  }`}
                 >
-                  <Repeat2 className="w-4 h-4" />
-                </motion.div>
-              </div>
-              <span className="text-sm">{reposts}</span>
-            </button>
+                  <div className={`p-2 rounded-full transition-colors ${
+                    reposted ? "bg-green-500/10" : "group-hover:bg-green-500/10"
+                  }`}>
+                    <motion.div
+                      animate={{ scale: reposted ? [1, 1.2, 1] : 1 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <Repeat2 className="w-4 h-4" />
+                    </motion.div>
+                  </div>
+                  <span className="text-sm">{reposts}</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="dark:bg-zinc-900 dark:border-zinc-800 light:bg-white light:border-gray-200">
+                <DropdownMenuItem
+                  onClick={handleRepost}
+                  className="dark:text-white light:text-black dark:focus:bg-zinc-800 light:focus:bg-gray-100 cursor-pointer"
+                >
+                  <Repeat2 className="w-4 h-4 mr-2" />
+                  {reposted ? "Undo Repost" : "Repost"}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setShowQuoteDialog(true)}
+                  className="dark:text-white light:text-black dark:focus:bg-zinc-800 light:focus:bg-gray-100 cursor-pointer"
+                >
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  Quote
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             <button
               onClick={() => setShowShareDialog(true)}
@@ -489,6 +535,73 @@ export default function PostCard({
                   <Send className="w-4 h-4" />
                 </button>
               </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quote Repost Dialog */}
+      <Dialog open={showQuoteDialog} onOpenChange={setShowQuoteDialog}>
+        <DialogContent className="dark:bg-zinc-900 dark:border-zinc-800 light:bg-white light:border-gray-200 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Quote Post</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Add your thoughts about this post
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Quote Input */}
+            <Textarea
+              placeholder="Add a comment..."
+              value={quoteText}
+              onChange={(e) => setQuoteText(e.target.value)}
+              className="min-h-[100px] dark:bg-zinc-800 light:bg-gray-100 dark:border-zinc-700 light:border-gray-300 resize-none"
+              maxLength={280}
+            />
+            <div className="text-right text-sm text-muted-foreground">
+              {quoteText.length}/280
+            </div>
+
+            {/* Original Post Preview */}
+            <div className="border dark:border-zinc-700 light:border-gray-300 rounded-xl p-3 dark:bg-zinc-800/50 light:bg-gray-50">
+              <div className="flex gap-2 items-start">
+                <Avatar className="w-8 h-8">
+                  <AvatarImage src={avatar} />
+                  <AvatarFallback className="dark:bg-zinc-700 dark:text-white light:bg-gray-300 light:text-black text-xs">
+                    {author.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1 text-sm">
+                    <span className="text-foreground font-medium">{author}</span>
+                    <span className="text-muted-foreground">@{username}</span>
+                    <span className="text-muted-foreground">·</span>
+                    <span className="text-muted-foreground">{timeAgo}</span>
+                  </div>
+                  <p className="text-foreground text-sm mt-1">
+                    {content.length > 100 ? `${content.substring(0, 100)}...` : content}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setShowQuoteDialog(false)}
+                variant="outline"
+                className="flex-1 dark:border-zinc-700 light:border-gray-300"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleQuoteRepost}
+                disabled={!quoteText.trim()}
+                className="flex-1 dark:bg-green-600 dark:hover:bg-green-700 light:bg-green-600 light:hover:bg-green-700 text-white"
+              >
+                Quote Post
+              </Button>
             </div>
           </div>
         </DialogContent>

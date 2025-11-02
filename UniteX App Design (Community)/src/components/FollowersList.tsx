@@ -82,11 +82,55 @@ interface FollowersListProps {
   onBack: () => void;
   onNavigateToProfile?: (username: string) => void;
   initialTab?: "followers" | "following";
+  username?: string;
+  profileName?: string;
 }
 
-export default function FollowersList({ onBack, onNavigateToProfile, initialTab = "followers" }: FollowersListProps) {
-  const [followers, setFollowers] = useState(mockFollowers);
-  const [following, setFollowing] = useState(mockFollowing);
+export default function FollowersList({ onBack, onNavigateToProfile, initialTab = "followers", username = "alexjohnson", profileName }: FollowersListProps) {
+  // Generate different follower lists based on username
+  const getFollowersData = (user: string) => {
+    if (user === "sydneysweeny") {
+      return {
+        followers: [
+          ...mockFollowers,
+          ...Array.from({ length: 253 }, (_, i) => ({
+            name: `Student ${i + 5}`,
+            username: `student${i + 5}`,
+            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=Student${i + 5}`,
+            department: ["CS", "Business", "Design", "Law", "Engineering"][i % 5],
+            bio: `${["CS", "Business", "Design", "Law", "Engineering"][i % 5]} student | Learning and growing`,
+            isFollowing: Math.random() > 0.5,
+          }))
+        ],
+        following: mockFollowing,
+        name: "Sydney Sweeny",
+        username: "sydneysweeny"
+      };
+    } else if (user === "simran") {
+      return {
+        followers: [
+          { name: "Business Student 1", username: "bizstudent1", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=BizStudent1", department: "Business", bio: "Marketing enthusiast", isFollowing: true },
+          { name: "Eco Warrior", username: "ecowarrior", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=EcoWarrior", department: "Environmental", bio: "Sustainability advocate", isFollowing: false },
+        ],
+        following: [
+          { name: "Green Initiative", username: "greeninit", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=GreenInit", department: "Environmental", bio: "Campus sustainability", isFollowing: true },
+        ],
+        name: "Simran",
+        username: "simran"
+      };
+    } else {
+      return {
+        followers: mockFollowers.slice(0, 2),
+        following: mockFollowing.slice(0, 1),
+        name: "Alex Johnson",
+        username: "alexjohnson"
+      };
+    }
+  };
+
+  const userData = getFollowersData(username);
+  const [followers, setFollowers] = useState(userData.followers);
+  const [following, setFollowing] = useState(userData.following);
 
   const handleFollowToggle = (username: string, type: "followers" | "following") => {
     if (type === "followers") {
@@ -182,8 +226,8 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
             <ArrowLeft className="w-6 h-6 text-foreground" />
           </button>
           <div>
-            <h1 className="dark:text-white light:text-black text-xl">Alex Johnson</h1>
-            <p className="dark:text-zinc-500 light:text-gray-500 text-sm">@alexjohnson</p>
+            <h1 className="dark:text-white light:text-black text-xl">{profileName || userData.name}</h1>
+            <p className="dark:text-zinc-500 light:text-gray-500 text-sm">@{username}</p>
           </div>
         </div>
       </div>

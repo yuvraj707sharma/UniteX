@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Mail, Lock } from "lucide-react";
+import { Mail } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { validateEmail } from '../utils/sanitize';
@@ -107,7 +107,6 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
             {error && (
               <p className="text-red-500 text-sm mt-1">{error}</p>
             )}
-            </div>
           </div>
 
           <Button

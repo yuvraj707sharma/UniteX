@@ -9,7 +9,7 @@ import PostCard from "./PostCard";
 import EditProfile from "./EditProfile";
 
 interface ProfileProps {
-  onNavigateToFollowers?: (tab?: "followers" | "following") => void;
+  onNavigateToFollowers?: (tab: "followers" | "following", username: string, profileName: string) => void;
 }
 
 const mockProfile = {
@@ -139,11 +139,11 @@ export default function Profile({ onNavigateToFollowers }: ProfileProps = {}) {
             </Avatar>
 
             <div className="flex gap-4">
-              <button onClick={() => onNavigateToFollowers?.("followers")} className="text-center">
+              <button onClick={() => onNavigateToFollowers?.("followers", profileData.username, profileData.name)} className="text-center">
                 <p className="dark:text-white light:text-black text-xl">{profileData.followers}</p>
                 <p className="dark:text-zinc-500 light:text-gray-500 text-sm">Followers</p>
               </button>
-              <button onClick={() => onNavigateToFollowers?.("following")} className="text-center">
+              <button onClick={() => onNavigateToFollowers?.("following", profileData.username, profileData.name)} className="text-center">
                 <p className="dark:text-white light:text-black text-xl">{profileData.following}</p>
                 <p className="dark:text-zinc-500 light:text-gray-500 text-sm">Following</p>
               </button>

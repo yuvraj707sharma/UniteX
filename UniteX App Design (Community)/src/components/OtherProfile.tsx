@@ -12,7 +12,7 @@ interface OtherProfileProps {
   username: string;
   onBack: () => void;
   onNavigateToChat?: (user: { name: string; username: string; avatar: string }) => void;
-  onNavigateToFollowers?: () => void;
+  onNavigateToFollowers?: (username: string, profileName: string) => void;
 }
 
 // Mock data - in real app, this would be fetched based on username
@@ -243,11 +243,11 @@ export default function OtherProfile({ username, onBack, onNavigateToChat, onNav
             </Avatar>
 
             <div className="flex gap-4">
-              <button onClick={onNavigateToFollowers} className="text-center">
+              <button onClick={() => onNavigateToFollowers?.(username, profile.name)} className="text-center">
                 <p className="dark:text-white light:text-black text-xl">{profile.followers}</p>
                 <p className="dark:text-zinc-500 light:text-gray-500 text-sm">Followers</p>
               </button>
-              <button onClick={onNavigateToFollowers} className="text-center">
+              <button onClick={() => onNavigateToFollowers?.(username, profile.name)} className="text-center">
                 <p className="dark:text-white light:text-black text-xl">{profile.following}</p>
                 <p className="dark:text-zinc-500 light:text-gray-500 text-sm">Following</p>
               </button>

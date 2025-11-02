@@ -108,9 +108,10 @@ interface NotificationItemProps {
   onAccept?: (id: number) => void;
   onDecline?: (id: number) => void;
   onMarkAsRead?: (id: number) => void;
+  onNavigateToPost?: (username: string) => void;
 }
 
-function NotificationItem({ notification, onAccept, onDecline, onMarkAsRead }: NotificationItemProps) {
+function NotificationItem({ notification, onAccept, onDecline, onMarkAsRead, onNavigateToPost }: NotificationItemProps) {
   const handleClick = () => {
     if (!notification.read && onMarkAsRead) {
       onMarkAsRead(notification.id);
@@ -118,7 +119,7 @@ function NotificationItem({ notification, onAccept, onDecline, onMarkAsRead }: N
     
     // Navigate to relevant content
     if (notification.type === "like" || notification.type === "comment" || notification.type === "mention") {
-      toast.info("Opening post...");
+      onNavigateToPost?.(notification.username);
     }
   };
 
@@ -182,8 +183,32 @@ function NotificationItem({ notification, onAccept, onDecline, onMarkAsRead }: N
   );
 }
 
-export default function Notifications() {
-  const [notifications, setNotifications] = useState(initialNotifications);
+interface NotificationsProps {
+  onNavigateToProfile?: (username: string) => void;
+}
+
+export default function Notifications({ onNavigateToProfile }: NotificationsProps = {}) {
+  // Load read notifications from localStorage
+  const getReadNotifications = () => {
+    try {
+      const saved = localStorage.getItem('readNotifications');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const [readNotificationIds, setReadNotificationIds] = useState<number[]>(getReadNotifications());
+  
+  // Mark notifications as read based on localStorage
+  const [notifications, setNotifications] = useState(() => {
+    const readIds = getReadNotifications();
+    return {
+      all: initialNotifications.all.map(n => ({ ...n, read: readIds.includes(n.id) || n.read })),
+      collaborations: initialNotifications.collaborations.map(n => ({ ...n, read: readIds.includes(n.id) || n.read })),
+      mentions: initialNotifications.mentions.map(n => ({ ...n, read: readIds.includes(n.id) || n.read })),
+    };
+  });
 
   const handleAccept = (id: number) => {
     toast.success("Collaboration request accepted!");
@@ -212,6 +237,10 @@ export default function Notifications() {
   };
 
   const handleMarkAsRead = (id: number) => {
+    const newReadIds = [...readNotificationIds, id];
+    setReadNotificationIds(newReadIds);
+    localStorage.setItem('readNotifications', JSON.stringify(newReadIds));
+    
     setNotifications((prev) => ({
       ...prev,
       all: prev.all.map((n) => (n.id === id ? { ...n, read: true } : n)),
@@ -272,6 +301,7 @@ export default function Notifications() {
                     onAccept={handleAccept}
                     onDecline={handleDecline}
                     onMarkAsRead={handleMarkAsRead}
+                    onNavigateToPost={onNavigateToProfile}
                   />
                 </motion.div>
               ))}
@@ -296,6 +326,7 @@ export default function Notifications() {
                     onAccept={handleAccept}
                     onDecline={handleDecline}
                     onMarkAsRead={handleMarkAsRead}
+                    onNavigateToPost={onNavigateToProfile}
                   />
                 </motion.div>
               ))}
@@ -318,6 +349,7 @@ export default function Notifications() {
                   <NotificationItem 
                     notification={notification}
                     onMarkAsRead={handleMarkAsRead}
+                    onNavigateToPost={onNavigateToProfile}
                   />
                 </motion.div>
               ))}

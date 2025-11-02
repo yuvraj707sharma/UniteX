@@ -1,4 +1,5 @@
 import { useState } from "react";
+import * as React from "react";
 import { Search, Settings, Edit, User } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
@@ -62,14 +63,21 @@ interface MessagesProps {
     username: string;
     avatar: string;
   } | null;
+  onClearUnread?: () => void;
+  onChatStateChange?: (inChat: boolean) => void;
 }
 
-export default function Messages({ initialChat }: MessagesProps = {}) {
+export default function Messages({ initialChat, onClearUnread, onChatStateChange }: MessagesProps = {}) {
   const [selectedChat, setSelectedChat] = useState<{
     name: string;
     username: string;
     avatar: string;
   } | null>(initialChat || null);
+
+  // Notify parent when chat state changes
+  React.useEffect(() => {
+    onChatStateChange?.(!!selectedChat);
+  }, [selectedChat, onChatStateChange]);
   const [showNewMessageDialog, setShowNewMessageDialog] = useState(false);
   const [searchUsername, setSearchUsername] = useState("");
 
@@ -78,6 +86,7 @@ export default function Messages({ initialChat }: MessagesProps = {}) {
       <ChatConversation
         onBack={() => setSelectedChat(null)}
         user={selectedChat}
+        onClearUnread={onClearUnread}
       />
     );
   }

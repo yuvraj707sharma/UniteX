@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { ArrowLeft, MoreVertical, Send, Check, CheckCheck, Plus, Video, Phone, Image as ImageIcon, Film } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { motion } from "framer-motion";
@@ -27,9 +27,14 @@ interface ChatConversationProps {
     username: string;
     avatar: string;
   };
+  onClearUnread?: () => void;
 }
 
-export default function ChatConversation({ onBack, user }: ChatConversationProps) {
+export default function ChatConversation({ onBack, user, onClearUnread }: ChatConversationProps) {
+  // Clear unread messages when chat opens
+  useEffect(() => {
+    onClearUnread?.();
+  }, [onClearUnread]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -63,6 +68,11 @@ export default function ChatConversation({ onBack, user }: ChatConversationProps
   ]);
 
   const [inputText, setInputText] = useState("");
+  const [selectedMedia, setSelectedMedia] = useState<{
+    file: File;
+    type: "image" | "video";
+    url: string;
+  } | null>(null);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -71,29 +81,11 @@ export default function ChatConversation({ onBack, user }: ChatConversationProps
     const fileType = file.type.startsWith("image") ? "image" : "video";
     const fileURL = URL.createObjectURL(file);
 
-    const newMessage: Message = {
-      id: messages.length + 1,
-      text: fileType === "image" ? "📷 Photo" : "🎥 Video",
-      timestamp: new Date().toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-      }),
-      isSent: true,
-      status: "sent",
-      [fileType]: fileURL,
-    };
-
-    setMessages([...messages, newMessage]);
-    toast.success(`${fileType === "image" ? "Photo" : "Video"} sent!`);
-
-    // Simulate delivery
-    setTimeout(() => {
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === newMessage.id ? { ...msg, status: "delivered" } : msg
-        )
-      );
-    }, 1000);
+    setSelectedMedia({
+      file,
+      type: fileType,
+      url: fileURL,
+    });
 
     // Reset file input
     if (fileInputRef.current) {
@@ -102,21 +94,25 @@ export default function ChatConversation({ onBack, user }: ChatConversationProps
   };
 
   const handleSendMessage = () => {
-    if (!inputText.trim()) return;
+    if (!inputText.trim() && !selectedMedia) return;
 
     const newMessage: Message = {
       id: messages.length + 1,
-      text: inputText,
+      text: selectedMedia 
+        ? `${selectedMedia.type === "image" ? "📷 Photo" : "🎥 Video"}${inputText ? `: ${inputText}` : ""}`
+        : inputText,
       timestamp: new Date().toLocaleTimeString("en-US", {
         hour: "numeric",
         minute: "2-digit",
       }),
       isSent: true,
       status: "sent",
+      ...(selectedMedia && { [selectedMedia.type]: selectedMedia.url }),
     };
 
     setMessages([...messages, newMessage]);
     setInputText("");
+    setSelectedMedia(null);
 
     // Simulate message delivery
     setTimeout(() => {
@@ -193,7 +189,7 @@ export default function ChatConversation({ onBack, user }: ChatConversationProps
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-20">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-24">
         {messages.map((message, index) => (
           <motion.div
             key={message.id}
@@ -253,7 +249,36 @@ export default function ChatConversation({ onBack, user }: ChatConversationProps
       </div>
 
       {/* Input */}
-      <div className="sticky bottom-0 dark:bg-black light:bg-white border-t dark:border-zinc-800 light:border-gray-200 p-4">
+      <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto dark:bg-black light:bg-white border-t dark:border-zinc-800 light:border-gray-200 p-4 z-50">
+        {/* Media Preview */}
+        {selectedMedia && (
+          <div className="mb-2 flex items-center gap-2 p-2 dark:bg-zinc-900 light:bg-gray-100 rounded-lg">
+            <div className="relative w-12 h-12 rounded-lg overflow-hidden border dark:border-zinc-700 light:border-gray-300 flex-shrink-0">
+              {selectedMedia.type === "image" ? (
+                <img
+                  src={selectedMedia.url}
+                  alt="Preview"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <video
+                  src={selectedMedia.url}
+                  className="w-full h-full object-cover"
+                  controls={false}
+                />
+              )}
+            </div>
+            <span className="text-sm text-muted-foreground flex-1">
+              {selectedMedia.type === "image" ? "📷 Photo" : "🎥 Video"}
+            </span>
+            <button
+              onClick={() => setSelectedMedia(null)}
+              className="w-6 h-6 dark:bg-zinc-700 light:bg-gray-300 text-foreground rounded-full flex items-center justify-center text-sm hover:opacity-70"
+            >
+              ×
+            </button>
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <input
             ref={fileInputRef}
@@ -310,7 +335,7 @@ export default function ChatConversation({ onBack, user }: ChatConversationProps
           />
           <button
             onClick={handleSendMessage}
-            disabled={!inputText.trim()}
+            disabled={!inputText.trim() && !selectedMedia}
             className="w-12 h-12 dark:bg-blue-500 light:bg-red-600 hover:opacity-90 text-white rounded-full flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
           >
             <Send className="w-5 h-5" />

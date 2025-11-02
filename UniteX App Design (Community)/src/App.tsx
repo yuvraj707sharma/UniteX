@@ -55,25 +55,68 @@ export default function App() {
   };
 
   const handleNavigate = (screen: string) => {
-    if (screen !== "messages") {
-      setPreselectedChat(null);
+    try {
+      const validScreens: Screen[] = [
+        "login", "home", "search", "communities", "notifications", 
+        "profile", "otherProfile", "followers", "messages", "settings", 
+        "bookmarks", "project", "jobs", "lists", "spaces"
+      ];
+      
+      if (!validScreens.includes(screen as Screen)) {
+        console.error('Invalid screen:', screen);
+        return;
+      }
+      
+      if (screen !== "messages") {
+        setPreselectedChat(null);
+      }
+      setCurrentScreen(screen as Screen);
+    } catch (error) {
+      console.error('Navigation error:', error);
     }
-    setCurrentScreen(screen as Screen);
   };
 
   const handleNavigateToOtherProfile = (username: string) => {
-    setSelectedUsername(username);
-    setCurrentScreen("otherProfile");
+    try {
+      if (!username || typeof username !== 'string') {
+        console.error('Invalid username provided');
+        return;
+      }
+      setSelectedUsername(username.trim());
+      setCurrentScreen("otherProfile");
+    } catch (error) {
+      console.error('Error navigating to profile:', error);
+    }
   };
 
   const handleNavigateToFollowers = (tab: "followers" | "following" = "followers") => {
-    setFollowersTab(tab);
-    setCurrentScreen("followers");
+    try {
+      if (tab !== "followers" && tab !== "following") {
+        console.error('Invalid followers tab:', tab);
+        return;
+      }
+      setFollowersTab(tab);
+      setCurrentScreen("followers");
+    } catch (error) {
+      console.error('Error navigating to followers:', error);
+    }
   };
 
   const handleNavigateToChat = (user: { name: string; username: string; avatar: string }) => {
-    setPreselectedChat(user);
-    setCurrentScreen("messages");
+    try {
+      if (!user || !user.name || !user.username) {
+        console.error('Invalid user data for chat navigation');
+        return;
+      }
+      setPreselectedChat({
+        name: user.name.trim(),
+        username: user.username.trim(),
+        avatar: user.avatar || ''
+      });
+      setCurrentScreen("messages");
+    } catch (error) {
+      console.error('Error navigating to chat:', error);
+    }
   };
 
   // Animation variants for screen transitions
@@ -91,7 +134,8 @@ export default function App() {
 
   // Render current screen
   const renderScreen = () => {
-    switch (currentScreen) {
+    try {
+      switch (currentScreen) {
       case "login":
         return <LoginScreen onLogin={handleLogin} />;
       case "home":
@@ -154,6 +198,37 @@ export default function App() {
             onNavigateToMessages={() => setCurrentScreen("messages")}
           />
         );
+      default:
+        console.error('Unknown screen:', currentScreen);
+        return (
+          <div className="min-h-screen flex items-center justify-center bg-background">
+            <div className="text-center space-y-4">
+              <h1 className="text-xl font-bold text-foreground">Page not found</h1>
+              <button 
+                onClick={() => setCurrentScreen('home')}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg"
+              >
+                Go Home
+              </button>
+            </div>
+          </div>
+        );
+      }
+    } catch (error) {
+      console.error('Error rendering screen:', error);
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="text-center space-y-4">
+            <h1 className="text-xl font-bold text-foreground">Something went wrong</h1>
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg"
+            >
+              Refresh Page
+            </button>
+          </div>
+        </div>
+      );
     }
   };
 

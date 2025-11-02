@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { toast } from "sonner";
+import { sanitizeHtml, containsMaliciousContent } from '../utils/sanitize';
 
 interface PostCardProps {
   author: string;
@@ -83,23 +84,46 @@ export default function PostCard({
   };
 
   const handlePostComment = () => {
-    if (!commentText.trim()) return;
+    try {
+      const trimmedText = commentText.trim();
+      if (!trimmedText) {
+        toast.error('Please enter a comment');
+        return;
+      }
 
-    const newComment = {
-      id: postComments.length + 1,
-      author: "You",
-      username: "you",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=You",
-      text: commentText,
-      timeAgo: "Just now",
-      likes: 0,
-      liked: false,
-    };
+      if (trimmedText.length > 500) {
+        toast.error('Comment is too long (max 500 characters)');
+        return;
+      }
 
-    setPostComments([newComment, ...postComments]);
-    setComments(comments + 1);
-    setCommentText("");
-    toast.success("Comment posted!");
+      // Check for malicious content
+      if (containsMaliciousContent(trimmedText)) {
+        toast.error('Comment contains invalid content');
+        return;
+      }
+      
+      // Sanitize comment text to prevent XSS
+      const sanitizedText = sanitizeHtml(trimmedText);
+
+      const newComment = {
+        id: postComments.length + 1,
+        author: "You",
+        username: "you",
+        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=You",
+        text: sanitizedText,
+        timeAgo: "Just now",
+        likes: 0,
+        liked: false,
+      };
+
+      setPostComments([newComment, ...postComments]);
+      setComments(comments + 1);
+      setCommentText("");
+      toast.success("Comment posted!");
+    } catch (error) {
+      console.error('Error posting comment:', error);
+      toast.error('Failed to post comment');
+    }
   };
 
   const handleLikeComment = (commentId: number) => {
@@ -123,10 +147,28 @@ export default function PostCard({
     setShareSearchQuery("");
   };
 
-  const handleCopyLink = () => {
-    const postLink = `https://unitex.app/posts/${author.toLowerCase().replace(" ", "-")}-${Date.now()}`;
-    navigator.clipboard.writeText(postLink);
-    toast.success("Link copied to clipboard!");
+  const handleCopyLink = async () => {
+    try {
+      const sanitizedAuthor = author.toLowerCase().replace(/[^a-z0-9]/g, '-');
+      const postLink = `https://unitex.app/posts/${sanitizedAuthor}-${Date.now()}`;
+      
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(postLink);
+        toast.success("Link copied to clipboard!");
+      } else {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = postLink;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        toast.success("Link copied to clipboard!");
+      }
+    } catch (error) {
+      console.error('Error copying link:', error);
+      toast.error('Failed to copy link');
+    }
   };
 
   const handleRepost = () => {
@@ -171,7 +213,9 @@ export default function PostCard({
           </div>
 
           {/* Post Content */}
-          <p className="text-foreground mb-3">{content}</p>
+          <p className="text-foreground mb-3">
+            {sanitizeHtml(content).replace(/\n/g, ' ')}
+          </p>
 
           {/* Image */}
           {image && (

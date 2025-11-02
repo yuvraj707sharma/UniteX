@@ -6,6 +6,7 @@ import { Textarea } from './ui/textarea'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { Badge } from './ui/badge'
 import { toast } from 'sonner'
+import { sanitizeHtml, sanitizeUsername, validateUrl } from '../utils/sanitize'
 
 interface EditProfileProps {
   onBack: () => void
@@ -39,9 +40,18 @@ export default function EditProfile({ onBack, profile, onSave }: EditProfileProp
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+    try {
+      const file = event.target.files?.[0]
+      if (!file) return
+
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select a valid image file')
+        return
+      }
+
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
         toast.error('Image size should be less than 5MB')
         return
       }
@@ -49,16 +59,44 @@ export default function EditProfile({ onBack, profile, onSave }: EditProfileProp
       setAvatarFile(file)
       const reader = new FileReader()
       reader.onload = (e) => {
-        setAvatarPreview(e.target?.result as string)
+        const result = e.target?.result
+        if (typeof result === 'string') {
+          setAvatarPreview(result)
+        }
+      }
+      reader.onerror = () => {
+        toast.error('Failed to read image file')
       }
       reader.readAsDataURL(file)
+    } catch (error) {
+      console.error('Error handling avatar change:', error)
+      toast.error('Failed to process image')
     }
   }
 
   const addSkill = () => {
-    if (skillInput.trim() && !skills.includes(skillInput.trim())) {
-      setSkills([...skills, skillInput.trim()])
+    try {
+      const trimmedSkill = skillInput.trim()
+      if (!trimmedSkill) {
+        toast.error('Please enter a skill')
+        return
+      }
+      
+      if (skills.includes(trimmedSkill)) {
+        toast.error('Skill already added')
+        return
+      }
+      
+      if (skills.length >= 10) {
+        toast.error('Maximum 10 skills allowed')
+        return
+      }
+      
+      setSkills([...skills, trimmedSkill])
       setSkillInput('')
+    } catch (error) {
+      console.error('Error adding skill:', error)
+      toast.error('Failed to add skill')
     }
   }
 
@@ -67,15 +105,47 @@ export default function EditProfile({ onBack, profile, onSave }: EditProfileProp
   }
 
   const handleSave = () => {
-    const updatedProfile = {
-      ...profile,
-      ...formData,
-      skills,
-      avatar: avatarPreview
+    try {
+      // Validate required fields
+      if (!formData.name.trim()) {
+        toast.error('Name is required')
+        return
+      }
+      
+      if (!formData.username.trim()) {
+        toast.error('Username is required')
+        return
+      }
+      
+      // Validate website URL if provided
+      if (formData.website.trim() && !validateUrl(formData.website.trim())) {
+        toast.error('Please enter a valid website URL');
+        return;
+      }
+      
+      // Sanitize input data
+      const sanitizedData = {
+        name: sanitizeHtml(formData.name.trim()),
+        username: sanitizeUsername(formData.username.trim()),
+        bio: sanitizeHtml(formData.bio.trim()),
+        location: sanitizeHtml(formData.location.trim()),
+        website: formData.website.trim()
+      }
+      
+      const updatedProfile = {
+        ...profile,
+        ...sanitizedData,
+        skills: skills.map(skill => skill.trim()),
+        avatar: avatarPreview
+      }
+      
+      onSave(updatedProfile)
+      toast.success('Profile updated successfully!')
+      onBack()
+    } catch (error) {
+      console.error('Error saving profile:', error)
+      toast.error('Failed to save profile')
     }
-    onSave(updatedProfile)
-    toast.success('Profile updated successfully!')
-    onBack()
   }
 
   return (

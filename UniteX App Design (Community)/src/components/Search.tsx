@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Badge } from "./ui/badge";
 import { motion } from "framer-motion";
 import PostCard from "./PostCard";
+import { sanitizeSearchInput } from '../utils/sanitize';
 
 interface SearchProps {
   onNavigateToProfile?: (username: string) => void;
@@ -81,28 +82,69 @@ export default function Search({ onNavigateToProfile }: SearchProps = {}) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("top");
 
-  const filteredUsers = mockUsers.filter(
-    (user) =>
-      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.department.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      const sanitizedQuery = sanitizeSearchInput(e.target.value);
+      setSearchQuery(sanitizedQuery);
+    } catch (error) {
+      console.error('Error handling search input:', error);
+    }
+  };
 
-  const filteredCommunities = mockCommunities.filter(
-    (community) =>
-      community.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      community.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const safeSearchQuery = sanitizeSearchInput(searchQuery);
 
-  const filteredPosts = mockPosts.filter(
-    (post) =>
-      post.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      post.author.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredUsers = mockUsers.filter((user) => {
+    try {
+      if (!safeSearchQuery) return false;
+      const query = safeSearchQuery.toLowerCase();
+      return (
+        user.name.toLowerCase().includes(query) ||
+        user.username.toLowerCase().includes(query) ||
+        user.department.toLowerCase().includes(query)
+      );
+    } catch (error) {
+      console.error('Error filtering users:', error);
+      return false;
+    }
+  });
 
-  const filteredHashtags = trendingHashtags.filter((hashtag) =>
-    hashtag.tag.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredCommunities = mockCommunities.filter((community) => {
+    try {
+      if (!safeSearchQuery) return false;
+      const query = safeSearchQuery.toLowerCase();
+      return (
+        community.name.toLowerCase().includes(query) ||
+        community.description.toLowerCase().includes(query)
+      );
+    } catch (error) {
+      console.error('Error filtering communities:', error);
+      return false;
+    }
+  });
+
+  const filteredPosts = mockPosts.filter((post) => {
+    try {
+      if (!safeSearchQuery) return false;
+      const query = safeSearchQuery.toLowerCase();
+      return (
+        post.content.toLowerCase().includes(query) ||
+        post.author.toLowerCase().includes(query)
+      );
+    } catch (error) {
+      console.error('Error filtering posts:', error);
+      return false;
+    }
+  });
+
+  const filteredHashtags = trendingHashtags.filter((hashtag) => {
+    try {
+      if (!safeSearchQuery) return false;
+      return hashtag.tag.toLowerCase().includes(safeSearchQuery.toLowerCase());
+    } catch (error) {
+      console.error('Error filtering hashtags:', error);
+      return false;
+    }
+  });
 
   return (
     <div className="min-h-screen bg-background pb-20 max-w-md mx-auto">
@@ -115,7 +157,8 @@ export default function Search({ onNavigateToProfile }: SearchProps = {}) {
               type="text"
               placeholder="Search UniteX"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={handleSearchChange}
+              maxLength={100}
               className="w-full pl-12 pr-10 py-3 dark:bg-zinc-900 dark:border-zinc-800 light:bg-gray-100 light:border-gray-300 rounded-full text-foreground placeholder:text-muted-foreground focus:outline-none dark:focus:border-zinc-700 light:focus:border-gray-400 border"
               autoFocus
             />
@@ -173,7 +216,14 @@ export default function Search({ onNavigateToProfile }: SearchProps = {}) {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.05 }}
-                onClick={() => setSearchQuery(`#${hashtag.tag}`)}
+                onClick={() => {
+                  try {
+                    const hashtagQuery = `#${hashtag.tag}`;
+                    setSearchQuery(sanitizeSearchInput(hashtagQuery));
+                  } catch (error) {
+                    console.error('Error setting hashtag search:', error);
+                  }
+                }}
                 className="w-full p-4 dark:bg-zinc-900 light:bg-gray-50 rounded-2xl border dark:border-zinc-800 light:border-gray-200 dark:hover:bg-zinc-800 light:hover:bg-gray-100 transition-colors text-left"
               >
                 <div className="flex items-center gap-3">

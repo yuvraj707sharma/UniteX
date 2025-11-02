@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Mail, Lock } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import { validateEmail } from '../utils/sanitize';
 
 interface LoginScreenProps {
   onLogin: () => void;
@@ -11,14 +12,51 @@ interface LoginScreenProps {
 export default function LoginScreen({ onLogin }: LoginScreenProps) {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleLogin = () => {
-    if (email.includes("@") && email.includes(".edu")) {
+
+
+  const isValidUniversityEmail = (email: string): boolean => {
+    const validDomains = ['.edu', '.ac.', '.edu.'];
+    return validDomains.some(domain => email.toLowerCase().includes(domain));
+  };
+
+  const handleLogin = async () => {
+    try {
+      setError("");
+      
+      if (!email.trim()) {
+        setError("Please enter your email address");
+        return;
+      }
+
+      if (!validateEmail(email)) {
+        setError("Please enter a valid email address");
+        return;
+      }
+
+      if (!isValidUniversityEmail(email)) {
+        setError("Please use a valid university email (.edu domain)");
+        return;
+      }
+
       setIsLoading(true);
-      setTimeout(() => {
-        onLogin();
-      }, 1000);
+      
+      // Simulate authentication delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      onLogin();
+    } catch (error) {
+      console.error('Login error:', error);
+      setError("Login failed. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEmail(e.target.value);
+    if (error) setError(""); // Clear error when user starts typing
   };
 
   return (
@@ -55,16 +93,27 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                 type="email"
                 placeholder="yourname@college.edu"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="pl-12 dark:bg-zinc-900 dark:border-zinc-800 dark:text-white light:bg-gray-100 light:border-gray-300 light:text-black placeholder:text-muted-foreground h-14 rounded-2xl"
+                onChange={handleEmailChange}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !isLoading) {
+                    handleLogin();
+                  }
+                }}
+                className={`pl-12 dark:bg-zinc-900 dark:border-zinc-800 dark:text-white light:bg-gray-100 light:border-gray-300 light:text-black placeholder:text-muted-foreground h-14 rounded-2xl ${
+                  error ? 'border-red-500 focus:border-red-500' : ''
+                }`}
               />
+            </div>
+            {error && (
+              <p className="text-red-500 text-sm mt-1">{error}</p>
+            )}
             </div>
           </div>
 
           <Button
             onClick={handleLogin}
-            disabled={!email.includes("@") || !email.includes(".edu") || isLoading}
-            className="w-full h-14 dark:bg-blue-500 dark:hover:bg-blue-600 light:bg-red-600 light:hover:bg-red-700 text-white rounded-2xl disabled:opacity-50"
+            disabled={!email.trim() || isLoading}
+            className="w-full h-14 dark:bg-blue-500 dark:hover:bg-blue-600 light:bg-red-600 light:hover:bg-red-700 text-white rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? "Signing In..." : "Sign In"}
           </Button>

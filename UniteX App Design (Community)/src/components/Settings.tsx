@@ -1,9 +1,20 @@
+import { useState } from "react";
 import { ArrowLeft, ChevronRight, User, Bell, Shield, Eye, Globe, HelpCircle, Info } from "lucide-react";
-import { motion } from "motion/react";
+import { motion } from "framer-motion";
+import { toast } from "sonner";
+import AccountSettings from "./AccountSettings";
+import SecuritySettings from "./SecuritySettings";
+import PrivacySettings from "./PrivacySettings";
+import NotificationSettings from "./NotificationSettings";
+import DisplaySettings from "./DisplaySettings";
+import HelpCenter from "./HelpCenter";
+import AboutPage from "./AboutPage";
 
 interface SettingsProps {
   onBack: () => void;
 }
+
+type SettingsView = "main" | "account" | "security" | "privacy" | "notifications" | "display" | "help" | "about";
 
 const settingsOptions = [
   {
@@ -31,6 +42,64 @@ const settingsOptions = [
 ];
 
 export default function Settings({ onBack }: SettingsProps) {
+  const [currentView, setCurrentView] = useState<SettingsView>("main");
+
+  const handleSettingClick = (setting: string) => {
+    switch (setting) {
+      case "Account Information":
+        setCurrentView("account");
+        break;
+      case "Security and account access":
+        setCurrentView("security");
+        break;
+      case "Privacy and safety":
+        setCurrentView("privacy");
+        break;
+      case "Notifications":
+        setCurrentView("notifications");
+        break;
+      case "Accessibility, display, and languages":
+        setCurrentView("display");
+        break;
+      case "Help Center":
+        setCurrentView("help");
+        break;
+      case "About":
+        setCurrentView("about");
+        break;
+      default:
+        toast.info(`${setting} coming soon!`);
+    }
+  };
+
+  if (currentView === "account") {
+    return <AccountSettings onBack={() => setCurrentView("main")} />;
+  }
+
+  if (currentView === "security") {
+    return <SecuritySettings onBack={() => setCurrentView("main")} />;
+  }
+
+  if (currentView === "privacy") {
+    return <PrivacySettings onBack={() => setCurrentView("main")} />;
+  }
+
+  if (currentView === "notifications") {
+    return <NotificationSettings onBack={() => setCurrentView("main")} />;
+  }
+
+  if (currentView === "display") {
+    return <DisplaySettings onBack={() => setCurrentView("main")} />;
+  }
+
+  if (currentView === "help") {
+    return <HelpCenter onBack={() => setCurrentView("main")} />;
+  }
+
+  if (currentView === "about") {
+    return <AboutPage onBack={() => setCurrentView("main")} />;
+  }
+
   return (
     <div className="min-h-screen bg-background pb-20 max-w-md mx-auto">
       {/* Header */}
@@ -58,6 +127,7 @@ export default function Settings({ onBack }: SettingsProps) {
                 return (
                   <button
                     key={item.label}
+                    onClick={() => handleSettingClick(item.label)}
                     className={`w-full px-4 py-4 flex items-center gap-3 dark:hover:bg-zinc-800 light:hover:bg-gray-50 transition-colors ${
                       itemIndex !== section.items.length - 1 ? "border-b dark:border-zinc-800 light:border-gray-200" : ""
                     }`}

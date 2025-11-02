@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { Settings, Heart, MessageCircle, Users, AtSign } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import { motion } from "motion/react";
+import { Button } from "./ui/button";
+import { motion } from "framer-motion";
+import { toast } from "sonner";
 
-const mockNotifications = {
+const initialNotifications = {
   all: [
     {
       id: 1,
@@ -24,6 +27,7 @@ const mockNotifications = {
       content: "applied to join your AI Navigation project",
       time: "4h ago",
       read: false,
+      actionable: true,
     },
     {
       id: 3,
@@ -56,6 +60,7 @@ const mockNotifications = {
       content: "applied to join your AI Navigation project",
       time: "4h ago",
       read: false,
+      actionable: true,
     },
     {
       id: 5,
@@ -66,6 +71,7 @@ const mockNotifications = {
       content: "invited you to join IoT Parking System",
       time: "1d ago",
       read: true,
+      actionable: true,
     },
   ],
   mentions: [
@@ -99,12 +105,27 @@ const getNotificationIcon = (type: string) => {
 
 interface NotificationItemProps {
   notification: any;
+  onAccept?: (id: number) => void;
+  onDecline?: (id: number) => void;
+  onMarkAsRead?: (id: number) => void;
 }
 
-function NotificationItem({ notification }: NotificationItemProps) {
+function NotificationItem({ notification, onAccept, onDecline, onMarkAsRead }: NotificationItemProps) {
+  const handleClick = () => {
+    if (!notification.read && onMarkAsRead) {
+      onMarkAsRead(notification.id);
+    }
+    
+    // Navigate to relevant content
+    if (notification.type === "like" || notification.type === "comment" || notification.type === "mention") {
+      toast.info("Opening post...");
+    }
+  };
+
   return (
     <div
-      className={`flex items-start gap-3 px-4 py-4 border-b dark:border-zinc-800 light:border-gray-200 dark:hover:bg-zinc-950 light:hover:bg-gray-50 transition-colors ${
+      onClick={handleClick}
+      className={`flex items-start gap-3 px-4 py-4 border-b dark:border-zinc-800 light:border-gray-200 dark:hover:bg-zinc-950 light:hover:bg-gray-50 transition-colors cursor-pointer ${
         !notification.read ? "dark:bg-zinc-950/50 light:bg-gray-100/50" : ""
       }`}
     >
@@ -123,6 +144,31 @@ function NotificationItem({ notification }: NotificationItemProps) {
           <span className="text-muted-foreground"> {notification.content}</span>
         </p>
         <span className="text-muted-foreground text-sm">{notification.time}</span>
+
+        {/* Action Buttons for Collaboration Requests */}
+        {notification.actionable && notification.type === "collaboration" && (
+          <div className="flex gap-2 mt-3">
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                onAccept?.(notification.id);
+              }}
+              className="dark:bg-blue-500 dark:hover:bg-blue-600 light:bg-red-600 light:hover:bg-red-700 text-white rounded-full px-6 h-9"
+            >
+              Accept
+            </Button>
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDecline?.(notification.id);
+              }}
+              variant="outline"
+              className="dark:bg-transparent dark:border-zinc-700 dark:text-white dark:hover:bg-zinc-900 light:bg-transparent light:border-gray-300 light:text-black light:hover:bg-gray-100 rounded-full px-6 h-9"
+            >
+              Decline
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Icon */}
@@ -137,6 +183,45 @@ function NotificationItem({ notification }: NotificationItemProps) {
 }
 
 export default function Notifications() {
+  const [notifications, setNotifications] = useState(initialNotifications);
+
+  const handleAccept = (id: number) => {
+    toast.success("Collaboration request accepted!");
+    setNotifications((prev) => ({
+      ...prev,
+      all: prev.all.map((n) =>
+        n.id === id ? { ...n, actionable: false, read: true } : n
+      ),
+      collaborations: prev.collaborations.map((n) =>
+        n.id === id ? { ...n, actionable: false, read: true } : n
+      ),
+    }));
+  };
+
+  const handleDecline = (id: number) => {
+    toast.info("Collaboration request declined");
+    setNotifications((prev) => ({
+      ...prev,
+      all: prev.all.map((n) =>
+        n.id === id ? { ...n, actionable: false, read: true } : n
+      ),
+      collaborations: prev.collaborations.map((n) =>
+        n.id === id ? { ...n, actionable: false, read: true } : n
+      ),
+    }));
+  };
+
+  const handleMarkAsRead = (id: number) => {
+    setNotifications((prev) => ({
+      ...prev,
+      all: prev.all.map((n) => (n.id === id ? { ...n, read: true } : n)),
+      collaborations: prev.collaborations.map((n) =>
+        n.id === id ? { ...n, read: true } : n
+      ),
+      mentions: prev.mentions.map((n) => (n.id === id ? { ...n, read: true } : n)),
+    }));
+  };
+
   return (
     <div className="min-h-screen bg-background pb-20 max-w-md mx-auto">
       {/* Header */}
@@ -175,14 +260,19 @@ export default function Notifications() {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.3 }}
             >
-              {mockNotifications.all.map((notification, index) => (
+              {notifications.all.map((notification, index) => (
                 <motion.div
                   key={notification.id}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.05 }}
                 >
-                  <NotificationItem notification={notification} />
+                  <NotificationItem 
+                    notification={notification}
+                    onAccept={handleAccept}
+                    onDecline={handleDecline}
+                    onMarkAsRead={handleMarkAsRead}
+                  />
                 </motion.div>
               ))}
             </motion.div>
@@ -194,14 +284,19 @@ export default function Notifications() {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.3 }}
             >
-              {mockNotifications.collaborations.map((notification, index) => (
+              {notifications.collaborations.map((notification, index) => (
                 <motion.div
                   key={notification.id}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.05 }}
                 >
-                  <NotificationItem notification={notification} />
+                  <NotificationItem 
+                    notification={notification}
+                    onAccept={handleAccept}
+                    onDecline={handleDecline}
+                    onMarkAsRead={handleMarkAsRead}
+                  />
                 </motion.div>
               ))}
             </motion.div>
@@ -213,14 +308,17 @@ export default function Notifications() {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.3 }}
             >
-              {mockNotifications.mentions.map((notification, index) => (
+              {notifications.mentions.map((notification, index) => (
                 <motion.div
                   key={notification.id}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.05 }}
                 >
-                  <NotificationItem notification={notification} />
+                  <NotificationItem 
+                    notification={notification}
+                    onMarkAsRead={handleMarkAsRead}
+                  />
                 </motion.div>
               ))}
             </motion.div>

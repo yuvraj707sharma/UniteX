@@ -1,12 +1,14 @@
 import { Home, Search, Users, Bell, Mail } from "lucide-react";
-import { motion } from "motion/react";
+import { motion } from "framer-motion";
 
 interface BottomNavProps {
   activeScreen: string;
   onNavigate: (screen: string) => void;
+  unreadNotifications?: number;
+  unreadMessages?: number;
 }
 
-export default function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
+export default function BottomNav({ activeScreen, onNavigate, unreadNotifications = 0, unreadMessages = 0 }: BottomNavProps) {
   const navItems = [
     { id: "home", icon: Home, label: "Home" },
     { id: "search", icon: Search, label: "Search" },
@@ -21,6 +23,12 @@ export default function BottomNav({ activeScreen, onNavigate }: BottomNavProps) 
         const Icon = item.icon;
         const isActive = activeScreen === item.id;
         
+        const showBadge = 
+          (item.id === "notifications" && unreadNotifications > 0) ||
+          (item.id === "messages" && unreadMessages > 0);
+        
+        const badgeCount = item.id === "notifications" ? unreadNotifications : unreadMessages;
+
         return (
           <button
             key={item.id}
@@ -33,8 +41,18 @@ export default function BottomNav({ activeScreen, onNavigate }: BottomNavProps) 
                 opacity: isActive ? 1 : 0.5,
               }}
               transition={{ type: "spring", stiffness: 400, damping: 25 }}
+              className="relative"
             >
               <Icon className={`w-6 h-6 ${isActive ? "dark:text-blue-500 light:text-red-600" : "dark:text-zinc-400 light:text-gray-600"}`} />
+              {showBadge && (
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 dark:bg-red-500 light:bg-red-600 text-white text-xs rounded-full flex items-center justify-center"
+                >
+                  {badgeCount > 99 ? "99+" : badgeCount}
+                </motion.div>
+              )}
             </motion.div>
             {isActive && (
               <motion.div

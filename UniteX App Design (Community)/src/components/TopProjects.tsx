@@ -1,7 +1,7 @@
 import { ArrowLeft, Trophy, TrendingUp, Heart, Users, Calendar } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Badge } from "./ui/badge";
-import { motion } from "motion/react";
+import { motion } from "framer-motion";
 
 const mockTopProjects = [
   {
@@ -129,16 +129,16 @@ export default function TopProjects({ onBack }: TopProjectsProps) {
   };
 
   return (
-    <div className="min-h-screen bg-black pb-20 max-w-md mx-auto">
+    <div className="min-h-screen bg-background pb-20 max-w-md mx-auto">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-black/80 backdrop-blur-xl border-b border-zinc-800">
+      <div className="sticky top-0 z-10 dark:bg-black/80 light:bg-white/80 backdrop-blur-xl border-b dark:border-zinc-800 light:border-gray-200">
         <div className="flex items-center gap-4 px-4 py-3">
           <button onClick={onBack}>
-            <ArrowLeft className="w-6 h-6 text-white" />
+            <ArrowLeft className="w-6 h-6 dark:text-white light:text-black" />
           </button>
           <div className="flex-1">
-            <h1 className="text-white text-xl">Top Projects</h1>
-            <p className="text-zinc-500 text-sm">October 2025</p>
+            <h1 className="dark:text-white light:text-black text-xl">Top Projects</h1>
+            <p className="dark:text-zinc-500 light:text-gray-500 text-sm">October 2025</p>
           </div>
           <Trophy className="w-6 h-6 text-yellow-500" />
         </div>
@@ -157,8 +157,8 @@ export default function TopProjects({ onBack }: TopProjectsProps) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.05 }}
-            className={`relative overflow-hidden bg-zinc-900 rounded-2xl p-4 border ${
-              project.rank <= 3 ? "border-zinc-700" : "border-zinc-800"
+            className={`relative overflow-hidden dark:bg-zinc-900 light:bg-gray-50 rounded-2xl p-4 border ${
+              project.rank <= 3 ? "dark:border-zinc-700 light:border-gray-300" : "dark:border-zinc-800 light:border-gray-200"
             }`}
           >
             {/* Top 3 Gradient Background */}
@@ -174,36 +174,36 @@ export default function TopProjects({ onBack }: TopProjectsProps) {
                 {project.rank <= 3 ? (
                   <span className="text-3xl">{getMedalEmoji(project.rank)}</span>
                 ) : (
-                  <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center">
-                    <span className="text-white">{project.rank}</span>
+                  <div className="w-10 h-10 rounded-full dark:bg-zinc-800 light:bg-gray-200 flex items-center justify-center">
+                    <span className="dark:text-white light:text-black">{project.rank}</span>
                   </div>
                 )}
               </div>
 
               {/* Project Info */}
               <div className="flex-1 min-w-0">
-                <h3 className="text-white mb-1 truncate">{project.title}</h3>
+                <h3 className="dark:text-white light:text-black mb-1 truncate">{project.title}</h3>
                 
                 {/* Owner */}
                 <div className="flex items-center gap-2 mb-2">
                   <Avatar className="w-5 h-5">
                     <AvatarImage src={project.avatar} />
-                    <AvatarFallback className="bg-zinc-800 text-white text-xs">
+                    <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black text-xs">
                       {project.owner.charAt(0)}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="text-zinc-400 text-sm truncate">{project.owner}</span>
+                  <span className="dark:text-zinc-400 light:text-gray-600 text-sm truncate">{project.owner}</span>
                 </div>
 
                 {/* Department Badge */}
-                <Badge className="bg-blue-500/10 text-blue-400 border-blue-500/20 text-xs mb-2">
+                <Badge className="dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20 light:bg-red-50 light:text-red-600 light:border-red-200 text-xs mb-2">
                   {project.department}
                 </Badge>
 
                 {/* Stats */}
-                <div className="flex items-center gap-4 text-zinc-400 text-sm">
+                <div className="flex items-center gap-4 dark:text-zinc-400 light:text-gray-600 text-sm">
                   <div className="flex items-center gap-1">
-                    <Heart className="w-4 h-4 text-pink-500 fill-current" />
+                    <Heart className="w-4 h-4 dark:text-pink-500 light:text-red-500 fill-current" />
                     <span>{project.likes.toLocaleString()}</span>
                   </div>
                   <div className="flex items-center gap-1">
@@ -223,8 +223,8 @@ export default function TopProjects({ onBack }: TopProjectsProps) {
 
       {/* Footer Info */}
       <div className="px-4 py-6 text-center space-y-2">
-        <p className="text-zinc-500 text-sm">Rankings updated monthly</p>
-        <p className="text-zinc-600 text-xs">
+        <p className="dark:text-zinc-500 light:text-gray-500 text-sm">Rankings updated monthly</p>
+        <p className="dark:text-zinc-600 light:text-gray-400 text-xs">
           Based on likes, shares, and team engagement
         </p>
       </div>

@@ -1,9 +1,16 @@
+import { useState } from "react";
 import { Settings, MapPin, Calendar, Link as LinkIcon, Award, Briefcase } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { motion } from "motion/react";
+import { motion } from "framer-motion";
+import PostCard from "./PostCard";
+import EditProfile from "./EditProfile";
+
+interface ProfileProps {
+  onNavigateToFollowers?: (tab?: "followers" | "following") => void;
+}
 
 const mockProfile = {
   name: "Alex Johnson",
@@ -47,19 +54,71 @@ const mockProfile = {
       likes: 203,
     },
   ],
+  posts: [
+    {
+      author: "Alex Johnson",
+      username: "alexjohnson",
+      department: "Computer Science",
+      content: "Just published my thoughts on cross-departmental collaboration in tech startups. Check it out! 🚀 #collaboration #innovation",
+      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alex",
+      likes: 45,
+      comments: 12,
+      shares: 8,
+      timeAgo: "2h",
+    },
+    {
+      author: "Alex Johnson",
+      username: "alexjohnson",
+      department: "Computer Science",
+      content: "Looking for a business student to help validate my AI-powered study assistant app! DM me if interested. #AI #startup #collaboration",
+      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alex",
+      likes: 67,
+      comments: 23,
+      shares: 15,
+      timeAgo: "1d",
+    },
+    {
+      author: "Alex Johnson",
+      username: "alexjohnson",
+      department: "Computer Science",
+      content: "Excited to share that our campus navigation app prototype is ready for testing! 🎉",
+      image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80",
+      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alex",
+      likes: 134,
+      comments: 31,
+      shares: 22,
+      timeAgo: "3d",
+    },
+  ],
 };
 
-export default function Profile() {
+export default function Profile({ onNavigateToFollowers }: ProfileProps = {}) {
+  const [showEditProfile, setShowEditProfile] = useState(false)
+  const [profileData, setProfileData] = useState(mockProfile)
+
+  const handleSaveProfile = (updatedProfile: any) => {
+    setProfileData(updatedProfile)
+  }
+
+  if (showEditProfile) {
+    return (
+      <EditProfile
+        onBack={() => setShowEditProfile(false)}
+        profile={profileData}
+        onSave={handleSaveProfile}
+      />
+    )
+  }
   return (
-    <div className="min-h-screen bg-black pb-20 max-w-md mx-auto">
+    <div className="min-h-screen bg-background pb-20 max-w-md mx-auto">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-black/80 backdrop-blur-xl border-b border-zinc-800">
+      <div className="sticky top-0 z-10 dark:bg-black/80 light:bg-white/80 backdrop-blur-xl border-b dark:border-zinc-800 light:border-gray-200">
         <div className="flex items-center justify-between px-4 py-3">
           <div>
-            <h1 className="text-white text-xl">{mockProfile.name}</h1>
-            <p className="text-zinc-500 text-sm">{mockProfile.projects.length} projects</p>
+            <h1 className="dark:text-white light:text-black text-xl">{mockProfile.name}</h1>
+            <p className="dark:text-zinc-500 light:text-gray-500 text-sm">{mockProfile.projects.length} projects</p>
           </div>
-          <Settings className="w-6 h-6 text-zinc-400" />
+          <Settings className="w-6 h-6 dark:text-zinc-400 light:text-gray-600" />
         </div>
       </div>
 
@@ -69,54 +128,54 @@ export default function Profile() {
         transition={{ duration: 0.3 }}
       >
         {/* Profile Header */}
-        <div className="px-4 pt-4 pb-4 border-b border-zinc-800">
+        <div className="px-4 pt-4 pb-4 border-b dark:border-zinc-800 light:border-gray-200">
           {/* Avatar and Stats */}
           <div className="flex items-start justify-between mb-4">
-            <Avatar className="w-20 h-20 border-4 border-zinc-800">
-              <AvatarImage src={mockProfile.avatar} />
-              <AvatarFallback className="bg-zinc-800 text-white text-2xl">
-                {mockProfile.name.charAt(0)}
+            <Avatar className="w-20 h-20 border-4 dark:border-zinc-800 light:border-gray-200">
+              <AvatarImage src={profileData.avatar} />
+              <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black text-2xl">
+                {profileData.name.charAt(0)}
               </AvatarFallback>
             </Avatar>
 
             <div className="flex gap-4">
-              <div className="text-center">
-                <p className="text-white text-xl">{mockProfile.followers}</p>
-                <p className="text-zinc-500 text-sm">Followers</p>
-              </div>
-              <div className="text-center">
-                <p className="text-white text-xl">{mockProfile.following}</p>
-                <p className="text-zinc-500 text-sm">Following</p>
-              </div>
+              <button onClick={() => onNavigateToFollowers?.("followers")} className="text-center">
+                <p className="dark:text-white light:text-black text-xl">{profileData.followers}</p>
+                <p className="dark:text-zinc-500 light:text-gray-500 text-sm">Followers</p>
+              </button>
+              <button onClick={() => onNavigateToFollowers?.("following")} className="text-center">
+                <p className="dark:text-white light:text-black text-xl">{profileData.following}</p>
+                <p className="dark:text-zinc-500 light:text-gray-500 text-sm">Following</p>
+              </button>
             </div>
           </div>
 
           {/* Name and Department */}
           <div className="mb-3">
-            <h2 className="text-white text-xl mb-1">{mockProfile.name}</h2>
-            <p className="text-zinc-500">@{mockProfile.username}</p>
+            <h2 className="dark:text-white light:text-black text-xl mb-1">{profileData.name}</h2>
+            <p className="dark:text-zinc-500 light:text-gray-500">@{profileData.username}</p>
             <div className="flex items-center gap-2 mt-2">
-              <Badge className="bg-blue-500/10 text-blue-400 border-blue-500/20">
-                {mockProfile.department}
+              <Badge className="dark:bg-blue-500/10 light:bg-red-50 dark:text-blue-400 light:text-red-600 dark:border-blue-500/20 light:border-red-200">
+                {profileData.department}
               </Badge>
-              <Badge className="bg-zinc-800 text-zinc-300 border-zinc-700">
-                {mockProfile.year}
+              <Badge className="dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700 light:bg-gray-100 light:text-gray-700 light:border-gray-300">
+                {profileData.year}
               </Badge>
             </div>
           </div>
 
           {/* Bio */}
-          <p className="text-white mb-3">{mockProfile.bio}</p>
+          <p className="dark:text-white light:text-black mb-3">{profileData.bio}</p>
 
           {/* Meta Info */}
-          <div className="space-y-2 text-zinc-400 text-sm">
+          <div className="space-y-2 dark:text-zinc-400 light:text-gray-600 text-sm">
             <div className="flex items-center gap-2">
               <MapPin className="w-4 h-4" />
-              <span>{mockProfile.location}</span>
+              <span>{profileData.location}</span>
             </div>
             <div className="flex items-center gap-2">
               <LinkIcon className="w-4 h-4" />
-              <span className="text-blue-400">{mockProfile.website}</span>
+              <span className="dark:text-blue-400 light:text-red-600">{profileData.website}</span>
             </div>
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4" />
@@ -126,12 +185,15 @@ export default function Profile() {
 
           {/* Action Buttons */}
           <div className="flex gap-3 mt-4">
-            <Button className="flex-1 bg-blue-500 hover:bg-blue-600 text-white rounded-full">
+            <Button 
+              onClick={() => setShowEditProfile(true)}
+              className="flex-1 dark:bg-blue-500 dark:hover:bg-blue-600 light:bg-red-600 light:hover:bg-red-700 text-white rounded-full"
+            >
               Edit Profile
             </Button>
             <Button
               variant="outline"
-              className="flex-1 bg-transparent border-zinc-700 text-white hover:bg-zinc-900 rounded-full"
+              className="flex-1 bg-transparent dark:border-zinc-700 light:border-gray-300 dark:text-white light:text-black dark:hover:bg-zinc-900 light:hover:bg-gray-100 rounded-full"
             >
               Share Profile
             </Button>
@@ -139,16 +201,16 @@ export default function Profile() {
         </div>
 
         {/* Skills */}
-        <div className="px-4 py-4 border-b border-zinc-800">
-          <h3 className="text-white mb-3 flex items-center gap-2">
+        <div className="px-4 py-4 border-b dark:border-zinc-800 light:border-gray-200">
+          <h3 className="dark:text-white light:text-black mb-3 flex items-center gap-2">
             <Briefcase className="w-5 h-5" />
             Skills
           </h3>
           <div className="flex flex-wrap gap-2">
-            {mockProfile.skills.map((skill) => (
+            {profileData.skills.map((skill) => (
               <Badge
                 key={skill}
-                className="bg-zinc-800 text-zinc-300 border-zinc-700 rounded-full"
+                className="dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700 light:bg-gray-100 light:text-gray-700 light:border-gray-300 rounded-full"
               >
                 {skill}
               </Badge>
@@ -157,18 +219,18 @@ export default function Profile() {
         </div>
 
         {/* Achievements */}
-        <div className="px-4 py-4 border-b border-zinc-800">
-          <h3 className="text-white mb-3 flex items-center gap-2">
+        <div className="px-4 py-4 border-b dark:border-zinc-800 light:border-gray-200">
+          <h3 className="dark:text-white light:text-black mb-3 flex items-center gap-2">
             <Award className="w-5 h-5" />
             Achievements
           </h3>
           <div className="space-y-3">
-            {mockProfile.achievements.map((achievement, index) => (
+            {profileData.achievements.map((achievement, index) => (
               <div key={index} className="flex items-start gap-3">
                 <div className="text-2xl">{achievement.icon}</div>
                 <div>
-                  <p className="text-white">{achievement.title}</p>
-                  <p className="text-zinc-400 text-sm">{achievement.description}</p>
+                  <p className="dark:text-white light:text-black">{achievement.title}</p>
+                  <p className="dark:text-zinc-400 light:text-gray-600 text-sm">{achievement.description}</p>
                 </div>
               </div>
             ))}
@@ -177,17 +239,17 @@ export default function Profile() {
 
         {/* Posts & Projects Tabs */}
         <Tabs defaultValue="posts" className="w-full">
-          <div className="sticky top-[57px] z-10 bg-black/80 backdrop-blur-xl border-b border-zinc-800">
+          <div className="sticky top-[57px] z-10 dark:bg-black/80 light:bg-white/80 backdrop-blur-xl border-b dark:border-zinc-800 light:border-gray-200">
             <TabsList className="w-full bg-transparent rounded-none h-12 p-0">
               <TabsTrigger
                 value="posts"
-                className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-blue-500 data-[state=active]:bg-transparent bg-transparent text-zinc-500 data-[state=active]:text-white"
+                className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:dark:border-blue-500 data-[state=active]:light:border-red-600 data-[state=active]:bg-transparent bg-transparent dark:text-zinc-500 light:text-gray-500 data-[state=active]:dark:text-white data-[state=active]:light:text-black"
               >
                 Posts
               </TabsTrigger>
               <TabsTrigger
                 value="projects"
-                className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-blue-500 data-[state=active]:bg-transparent bg-transparent text-zinc-500 data-[state=active]:text-white"
+                className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:dark:border-blue-500 data-[state=active]:light:border-red-600 data-[state=active]:bg-transparent bg-transparent dark:text-zinc-500 light:text-gray-500 data-[state=active]:dark:text-white data-[state=active]:light:text-black"
               >
                 Projects
               </TabsTrigger>
@@ -195,66 +257,38 @@ export default function Profile() {
           </div>
 
           <TabsContent value="posts" className="m-0">
-            {/* User Posts */}
-            <div className="border-b border-zinc-800 px-4 py-4 hover:bg-zinc-950 transition-colors">
-              <p className="text-white mb-2">
-                Just published my thoughts on cross-departmental collaboration in tech startups. Check it out! 🚀
-              </p>
-              <div className="flex items-center gap-6 text-zinc-500 text-sm">
-                <span>2h ago</span>
-                <span>45 likes</span>
-                <span>12 comments</span>
-              </div>
-            </div>
-            <div className="border-b border-zinc-800 px-4 py-4 hover:bg-zinc-950 transition-colors">
-              <p className="text-white mb-2">
-                Looking for a business student to help validate my AI-powered study assistant app! 
-              </p>
-              <div className="flex items-center gap-6 text-zinc-500 text-sm">
-                <span>1d ago</span>
-                <span>67 likes</span>
-                <span>23 comments</span>
-              </div>
-            </div>
-            <div className="border-b border-zinc-800 px-4 py-4 hover:bg-zinc-950 transition-colors">
-              <p className="text-white mb-2">
-                Excited to share that our campus navigation app prototype is ready for testing! 
-              </p>
-              <div className="rounded-2xl overflow-hidden my-3 border border-zinc-800">
-                <img 
-                  src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80" 
-                  alt="Post" 
-                  className="w-full h-auto" 
-                />
-              </div>
-              <div className="flex items-center gap-6 text-zinc-500 text-sm">
-                <span>3d ago</span>
-                <span>134 likes</span>
-                <span>31 comments</span>
-              </div>
-            </div>
+            {profileData.posts.map((post, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <PostCard {...post} />
+              </motion.div>
+            ))}
           </TabsContent>
 
           <TabsContent value="projects" className="m-0 p-4 space-y-3">
-            {mockProfile.projects.map((project, index) => (
+            {profileData.projects.map((project, index) => (
               <motion.div
                 key={project.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
-                className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800"
+                className="dark:bg-zinc-900 light:bg-gray-50 rounded-2xl p-4 border dark:border-zinc-800 light:border-gray-200"
               >
                 <div className="flex items-start justify-between mb-2">
-                  <h4 className="text-white">{project.title}</h4>
+                  <h4 className="dark:text-white light:text-black">{project.title}</h4>
                   <Badge className={`text-xs ${
                     project.status === "Active" 
                       ? "bg-green-500/10 text-green-400 border-green-500/20" 
-                      : "bg-zinc-700 text-zinc-300 border-zinc-600"
+                      : "dark:bg-zinc-700 dark:text-zinc-300 dark:border-zinc-600 light:bg-gray-200 light:text-gray-700 light:border-gray-400"
                   }`}>
                     {project.status}
                   </Badge>
                 </div>
-                <div className="flex items-center gap-4 text-zinc-400 text-sm">
+                <div className="flex items-center gap-4 dark:text-zinc-400 light:text-gray-600 text-sm">
                   <span>{project.team} members</span>
                   <span>{project.likes} likes</span>
                 </div>

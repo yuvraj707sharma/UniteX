@@ -1,6 +1,6 @@
 import { ArrowLeft, MoreVertical } from "lucide-react";
 import PostCard from "./PostCard";
-import { motion } from "motion/react";
+import { motion } from "framer-motion";
 
 interface BookmarksProps {
   onBack: () => void;

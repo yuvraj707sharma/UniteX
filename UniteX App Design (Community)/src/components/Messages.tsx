@@ -1,6 +1,12 @@
-import { Search, Settings, Edit } from "lucide-react";
+import { useState } from "react";
+import { Search, Settings, Edit, User } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import { motion } from "motion/react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
+import { Input } from "./ui/input";
+import { Button } from "./ui/button";
+import { motion } from "framer-motion";
+import { toast } from "sonner";
+import ChatConversation from "./ChatConversation";
 
 const mockChats = [
   {
@@ -50,7 +56,32 @@ const mockChats = [
   },
 ];
 
-export default function Messages() {
+interface MessagesProps {
+  initialChat?: {
+    name: string;
+    username: string;
+    avatar: string;
+  } | null;
+}
+
+export default function Messages({ initialChat }: MessagesProps = {}) {
+  const [selectedChat, setSelectedChat] = useState<{
+    name: string;
+    username: string;
+    avatar: string;
+  } | null>(initialChat || null);
+  const [showNewMessageDialog, setShowNewMessageDialog] = useState(false);
+  const [searchUsername, setSearchUsername] = useState("");
+
+  if (selectedChat) {
+    return (
+      <ChatConversation
+        onBack={() => setSelectedChat(null)}
+        user={selectedChat}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background pb-20 max-w-md mx-auto">
       {/* Header */}
@@ -58,8 +89,12 @@ export default function Messages() {
         <div className="flex items-center justify-between px-4 py-3">
           <h1 className="text-foreground text-xl">Messages</h1>
           <div className="flex items-center gap-3">
-            <Settings className="w-6 h-6 text-muted-foreground" />
-            <Edit className="w-6 h-6 text-muted-foreground" />
+            <button onClick={() => toast.info("Message settings updated!")}>
+              <Settings className="w-6 h-6 text-muted-foreground" />
+            </button>
+            <button onClick={() => setShowNewMessageDialog(true)}>
+              <Edit className="w-6 h-6 text-muted-foreground" />
+            </button>
           </div>
         </div>
 
@@ -88,6 +123,13 @@ export default function Messages() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.05 }}
+            onClick={() =>
+              setSelectedChat({
+                name: chat.name,
+                username: chat.username,
+                avatar: chat.avatar,
+              })
+            }
             className="w-full px-4 py-4 flex items-start gap-3 border-b dark:border-zinc-800 light:border-gray-200 dark:hover:bg-zinc-950 light:hover:bg-gray-50 transition-colors"
           >
             {/* Avatar */}
@@ -130,6 +172,55 @@ export default function Messages() {
           </div>
         </div>
       )}
+
+      {/* New Message Dialog */}
+      <Dialog open={showNewMessageDialog} onOpenChange={setShowNewMessageDialog}>
+        <DialogContent className="dark:bg-zinc-900 dark:border-zinc-800 light:bg-white light:border-gray-200">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">New Message</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Search for a user to start a conversation
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <Input
+                placeholder="Search username..."
+                value={searchUsername}
+                onChange={(e) => setSearchUsername(e.target.value)}
+                className="pl-10 dark:bg-zinc-800 light:bg-gray-100 dark:border-zinc-700 light:border-gray-300"
+              />
+            </div>
+            
+            {/* Suggested Users */}
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {["Sarah Johnson", "Mike Chen", "Emma Davis"].map((user) => (
+                <button
+                  key={user}
+                  onClick={() => {
+                    toast.success(`Starting conversation with ${user}`);
+                    setShowNewMessageDialog(false);
+                    setSearchUsername("");
+                  }}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl dark:hover:bg-zinc-800 light:hover:bg-gray-100 transition-colors"
+                >
+                  <Avatar className="w-10 h-10">
+                    <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user}`} />
+                    <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black">
+                      {user.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="text-left">
+                    <p className="text-foreground">{user}</p>
+                    <p className="text-muted-foreground text-sm">@{user.toLowerCase().replace(" ", "")}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

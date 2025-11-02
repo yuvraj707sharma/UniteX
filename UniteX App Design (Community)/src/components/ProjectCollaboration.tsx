@@ -2,7 +2,7 @@ import { ArrowLeft, Shield, Users, Calendar, Tag, ExternalLink } from "lucide-re
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import { motion } from "motion/react";
+import { motion } from "framer-motion";
 
 const mockProject = {
   title: "AI-Powered Campus Navigation System",
@@ -28,14 +28,14 @@ interface ProjectCollaborationProps {
 
 export default function ProjectCollaboration({ onBack }: ProjectCollaborationProps) {
   return (
-    <div className="min-h-screen bg-black pb-20 max-w-md mx-auto">
+    <div className="min-h-screen bg-background pb-20 max-w-md mx-auto">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-black/80 backdrop-blur-xl border-b border-zinc-800">
+      <div className="sticky top-0 z-10 dark:bg-black/80 light:bg-white/80 backdrop-blur-xl border-b dark:border-zinc-800 light:border-gray-200">
         <div className="flex items-center gap-4 px-4 py-3">
           <button onClick={onBack}>
-            <ArrowLeft className="w-6 h-6 text-white" />
+            <ArrowLeft className="w-6 h-6 dark:text-white light:text-black" />
           </button>
-          <h1 className="text-white text-xl">Project Details</h1>
+          <h1 className="dark:text-white light:text-black text-xl">Project Details</h1>
         </div>
       </div>
 
@@ -47,7 +47,7 @@ export default function ProjectCollaboration({ onBack }: ProjectCollaborationPro
         {/* Project Header */}
         <div className="space-y-3">
           <div className="flex items-start justify-between gap-3">
-            <h2 className="text-white text-2xl flex-1">{mockProject.title}</h2>
+            <h2 className="dark:text-white light:text-black text-2xl flex-1">{mockProject.title}</h2>
             {mockProject.verified && (
               <Badge className="bg-green-500/10 text-green-400 border-green-500/20 flex items-center gap-1">
                 <Shield className="w-3 h-3" />
@@ -60,15 +60,15 @@ export default function ProjectCollaboration({ onBack }: ProjectCollaborationPro
           <div className="flex items-center gap-3">
             <Avatar className="w-12 h-12">
               <AvatarImage src={mockProject.owner.avatar} />
-              <AvatarFallback className="bg-zinc-800 text-white">
+              <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black">
                 {mockProject.owner.name.charAt(0)}
               </AvatarFallback>
             </Avatar>
             <div>
-              <p className="text-white">{mockProject.owner.name}</p>
+              <p className="dark:text-white light:text-black">{mockProject.owner.name}</p>
               <div className="flex items-center gap-2">
-                <span className="text-zinc-500 text-sm">@{mockProject.owner.username}</span>
-                <Badge className="bg-blue-500/10 text-blue-400 border-blue-500/20 text-xs">
+                <span className="dark:text-zinc-500 light:text-gray-500 text-sm">@{mockProject.owner.username}</span>
+                <Badge className="dark:bg-blue-500/10 light:bg-red-50 dark:text-blue-400 light:text-red-600 dark:border-blue-500/20 light:border-red-200 text-xs">
                   {mockProject.owner.department}
                 </Badge>
               </div>
@@ -78,13 +78,13 @@ export default function ProjectCollaboration({ onBack }: ProjectCollaborationPro
 
         {/* Description */}
         <div className="space-y-2">
-          <h3 className="text-white">About the Project</h3>
-          <p className="text-zinc-400">{mockProject.description}</p>
+          <h3 className="dark:text-white light:text-black">About the Project</h3>
+          <p className="dark:text-zinc-400 light:text-gray-600">{mockProject.description}</p>
         </div>
 
         {/* Departments Needed */}
         <div className="space-y-2">
-          <div className="flex items-center gap-2 text-white">
+          <div className="flex items-center gap-2 dark:text-white light:text-black">
             <Users className="w-5 h-5" />
             <h3>Departments Needed</h3>
           </div>
@@ -102,7 +102,7 @@ export default function ProjectCollaboration({ onBack }: ProjectCollaborationPro
 
         {/* Skills Needed */}
         <div className="space-y-2">
-          <div className="flex items-center gap-2 text-white">
+          <div className="flex items-center gap-2 dark:text-white light:text-black">
             <Tag className="w-5 h-5" />
             <h3>Skills Required</h3>
           </div>
@@ -110,7 +110,7 @@ export default function ProjectCollaboration({ onBack }: ProjectCollaborationPro
             {mockProject.skillsNeeded.map((skill) => (
               <Badge
                 key={skill}
-                className="bg-zinc-800 text-zinc-300 border-zinc-700 rounded-full"
+                className="dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700 light:bg-gray-100 light:text-gray-700 light:border-gray-300 rounded-full"
               >
                 {skill}
               </Badge>
@@ -120,37 +120,37 @@ export default function ProjectCollaboration({ onBack }: ProjectCollaborationPro
 
         {/* Project Stats */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800">
-            <div className="flex items-center gap-2 text-zinc-400 mb-1">
+          <div className="dark:bg-zinc-900 light:bg-gray-50 rounded-2xl p-4 border dark:border-zinc-800 light:border-gray-200">
+            <div className="flex items-center gap-2 dark:text-zinc-400 light:text-gray-600 mb-1">
               <Users className="w-4 h-4" />
               <span className="text-sm">Team</span>
             </div>
-            <p className="text-white text-xl">{mockProject.teamSize}</p>
+            <p className="dark:text-white light:text-black text-xl">{mockProject.teamSize}</p>
           </div>
 
-          <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800">
-            <div className="flex items-center gap-2 text-zinc-400 mb-1">
+          <div className="dark:bg-zinc-900 light:bg-gray-50 rounded-2xl p-4 border dark:border-zinc-800 light:border-gray-200">
+            <div className="flex items-center gap-2 dark:text-zinc-400 light:text-gray-600 mb-1">
               <Calendar className="w-4 h-4" />
               <span className="text-sm">Deadline</span>
             </div>
-            <p className="text-white text-xl">{mockProject.deadline}</p>
+            <p className="dark:text-white light:text-black text-xl">{mockProject.deadline}</p>
           </div>
         </div>
 
         {/* Engagement Stats */}
-        <div className="flex items-center gap-6 text-zinc-400 text-sm">
+        <div className="flex items-center gap-6 dark:text-zinc-400 light:text-gray-600 text-sm">
           <span>{mockProject.likes} likes</span>
           <span>{mockProject.applicants} applicants</span>
         </div>
 
         {/* Action Buttons */}
         <div className="space-y-3 pt-4">
-          <Button className="w-full h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-2xl">
+          <Button className="w-full h-14 dark:bg-blue-500 dark:hover:bg-blue-600 light:bg-red-600 light:hover:bg-red-700 text-white rounded-2xl">
             Apply to Join Project
           </Button>
           <Button
             variant="outline"
-            className="w-full h-14 bg-transparent border-zinc-700 text-white hover:bg-zinc-900 rounded-2xl"
+            className="w-full h-14 bg-transparent dark:border-zinc-700 light:border-gray-300 dark:text-white light:text-black dark:hover:bg-zinc-900 light:hover:bg-gray-100 rounded-2xl"
           >
             Contact Project Owner
           </Button>

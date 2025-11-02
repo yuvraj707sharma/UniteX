@@ -1,22 +1,23 @@
-import React from 'react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { motion, AnimatePresence } from "motion/react";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Toaster } from "./components/ui/sonner";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import { AuthProvider, useAuth } from './contexts/AuthContext'
-import { AuthForm } from './components/auth/AuthForm'
-import ProfileSetup from './components/ProfileSetup'
+import LoginScreen from "./components/LoginScreen";
 import HomeFeed from "./components/HomeFeed";
 import ProjectCollaboration from "./components/ProjectCollaboration";
 import Communities from "./components/Communities";
 import Notifications from "./components/Notifications";
 import Profile from "./components/Profile";
+import OtherProfile from "./components/OtherProfile";
+import FollowersList from "./components/FollowersList";
 import Messages from "./components/Messages";
 import Settings from "./components/Settings";
 import Bookmarks from "./components/Bookmarks";
+import Search from "./components/Search";
+import Jobs from "./components/Jobs";
+import Lists from "./components/Lists";
+import Spaces from "./components/Spaces";
 import BottomNav from "./components/BottomNav";
-
-const queryClient = new QueryClient()
 
 type Screen =
   | "login"
@@ -25,36 +26,54 @@ type Screen =
   | "communities"
   | "notifications"
   | "profile"
+  | "otherProfile"
+  | "followers"
   | "messages"
   | "settings"
   | "bookmarks"
-  | "project";
+  | "project"
+  | "jobs"
+  | "lists"
+  | "spaces";
 
-function AppContent() {
-  const { user, profile, loading } = useAuth()
-  const [currentScreen, setCurrentScreen] = React.useState<Screen>("home");
+export default function App() {
+  const [currentScreen, setCurrentScreen] = useState<Screen>("login");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(3);
+  const [unreadMessages, setUnreadMessages] = useState(2);
+  const [selectedUsername, setSelectedUsername] = useState("");
+  const [followersTab, setFollowersTab] = useState<"followers" | "following">("followers");
+  const [preselectedChat, setPreselectedChat] = useState<{
+    name: string;
+    username: string;
+    avatar: string;
+  } | null>(null);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-black">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    )
-  }
-
-  if (!user) {
-    return <AuthForm />
-  }
-
-  // Check if profile needs completion
-  const needsProfileSetup = !profile?.bio || !profile?.skills?.length
-
-  if (needsProfileSetup) {
-    return <ProfileSetup />
-  }
+  const handleLogin = () => {
+    setIsLoggedIn(true);
+    setCurrentScreen("home");
+  };
 
   const handleNavigate = (screen: string) => {
+    if (screen !== "messages") {
+      setPreselectedChat(null);
+    }
     setCurrentScreen(screen as Screen);
+  };
+
+  const handleNavigateToOtherProfile = (username: string) => {
+    setSelectedUsername(username);
+    setCurrentScreen("otherProfile");
+  };
+
+  const handleNavigateToFollowers = (tab: "followers" | "following" = "followers") => {
+    setFollowersTab(tab);
+    setCurrentScreen("followers");
+  };
+
+  const handleNavigateToChat = (user: { name: string; username: string; avatar: string }) => {
+    setPreselectedChat(user);
+    setCurrentScreen("messages");
   };
 
   // Animation variants for screen transitions
@@ -73,6 +92,8 @@ function AppContent() {
   // Render current screen
   const renderScreen = () => {
     switch (currentScreen) {
+      case "login":
+        return <LoginScreen onLogin={handleLogin} />;
       case "home":
         return (
           <HomeFeed
@@ -80,6 +101,9 @@ function AppContent() {
             onNavigateToSettings={() => setCurrentScreen("settings")}
             onNavigateToBookmarks={() => setCurrentScreen("bookmarks")}
             onNavigateToMessages={() => setCurrentScreen("messages")}
+            onNavigateToJobs={() => setCurrentScreen("jobs")}
+            onNavigateToLists={() => setCurrentScreen("lists")}
+            onNavigateToSpaces={() => setCurrentScreen("spaces")}
           />
         );
       case "project":
@@ -89,26 +113,38 @@ function AppContent() {
       case "notifications":
         return <Notifications />;
       case "profile":
-        return <Profile />;
+        return <Profile onNavigateToFollowers={handleNavigateToFollowers} />;
+      case "otherProfile":
+        return (
+          <OtherProfile
+            username={selectedUsername}
+            onBack={() => setCurrentScreen("home")}
+            onNavigateToFollowers={() => handleNavigateToFollowers()}
+            onNavigateToChat={handleNavigateToChat}
+          />
+        );
+      case "followers":
+        return (
+          <FollowersList
+            onBack={() => setCurrentScreen("profile")}
+            onNavigateToProfile={handleNavigateToOtherProfile}
+            initialTab={followersTab}
+          />
+        );
       case "messages":
-        return <Messages />;
+        return <Messages initialChat={preselectedChat} />;
       case "settings":
         return <Settings onBack={() => setCurrentScreen("home")} />;
       case "bookmarks":
         return <Bookmarks onBack={() => setCurrentScreen("home")} />;
       case "search":
-        return (
-          <div className="min-h-screen bg-black pb-20 max-w-md mx-auto flex items-center justify-center">
-            <div className="text-center space-y-4">
-              <div className="text-6xl mb-4">🔍</div>
-              <h2 className="text-white text-2xl">Search</h2>
-              <p className="text-zinc-400">
-                Search for projects, users, and ideas
-              </p>
-              <p className="text-zinc-600 text-sm">Coming soon...</p>
-            </div>
-          </div>
-        );
+        return <Search onNavigateToProfile={handleNavigateToOtherProfile} />;
+      case "jobs":
+        return <Jobs onBack={() => setCurrentScreen("home")} />;
+      case "lists":
+        return <Lists onBack={() => setCurrentScreen("home")} />;
+      case "spaces":
+        return <Spaces onBack={() => setCurrentScreen("home")} />;
       default:
         return (
           <HomeFeed
@@ -122,37 +158,41 @@ function AppContent() {
   };
 
   return (
-    <div className="relative min-h-screen bg-background">
-      <Toaster position="top-center" />
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={currentScreen}
-          variants={pageVariants}
-          initial="initial"
-          animate="animate"
-          exit="exit"
-          transition={pageTransition}
-        >
-          {renderScreen()}
-        </motion.div>
-      </AnimatePresence>
+    <ThemeProvider>
+      <div className="relative min-h-screen bg-background">
+        <Toaster position="top-center" />
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentScreen}
+            variants={pageVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={pageTransition}
+          >
+            {renderScreen()}
+          </motion.div>
+        </AnimatePresence>
 
-      {/* Bottom Navigation */}
-      {currentScreen !== "project" && currentScreen !== "settings" && currentScreen !== "bookmarks" && (
-        <BottomNav activeScreen={currentScreen} onNavigate={handleNavigate} />
-      )}
-    </div>
+        {/* Bottom Navigation - Only show when logged in */}
+        {isLoggedIn && 
+          currentScreen !== "login" && 
+          currentScreen !== "project" && 
+          currentScreen !== "settings" && 
+          currentScreen !== "bookmarks" &&
+          currentScreen !== "jobs" &&
+          currentScreen !== "lists" &&
+          currentScreen !== "spaces" &&
+          currentScreen !== "otherProfile" &&
+          currentScreen !== "followers" && (
+          <BottomNav 
+            activeScreen={currentScreen} 
+            onNavigate={handleNavigate}
+            unreadNotifications={unreadNotifications}
+            unreadMessages={unreadMessages}
+          />
+        )}
+      </div>
+    </ThemeProvider>
   );
-}
-
-export default function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <AuthProvider>
-          <AppContent />
-        </AuthProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
-  )
 }

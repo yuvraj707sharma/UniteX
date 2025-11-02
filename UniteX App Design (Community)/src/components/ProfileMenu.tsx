@@ -17,7 +17,7 @@ import { Badge } from "./ui/badge";
 import { Separator } from "./ui/separator";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden@1.1.0";
 import { useState } from "react";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import { useTheme } from "../contexts/ThemeContext";
 
 interface ProfileMenuProps {
@@ -25,13 +25,16 @@ interface ProfileMenuProps {
   onNavigateToSettings: () => void;
   onNavigateToBookmarks: () => void;
   onNavigateToMessages: () => void;
+  onNavigateToJobs?: () => void;
+  onNavigateToLists?: () => void;
+  onNavigateToSpaces?: () => void;
   children: React.ReactNode;
 }
 
 const mockUser = {
   name: "Alex Johnson",
   username: "alexjohnson",
-  avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alex",
+  avatar: "/api/placeholder/150/150", // This will be replaced with real uploaded images
   followers: 234,
   following: 156,
 };
@@ -41,11 +44,18 @@ export default function ProfileMenu({
   onNavigateToSettings,
   onNavigateToBookmarks,
   onNavigateToMessages,
+  onNavigateToJobs,
+  onNavigateToLists,
+  onNavigateToSpaces,
   children,
 }: ProfileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const { theme, toggleTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const isDarkMode = theme === "dark";
+
+  const toggleTheme = () => {
+    setTheme(isDarkMode ? "light" : "dark");
+  };
 
   const handleNavigation = (callback: () => void) => {
     setIsOpen(false);
@@ -71,7 +81,7 @@ export default function ProfileMenu({
           {/* User Info */}
           <div className="p-4 space-y-4">
             <Avatar className="w-12 h-12">
-              <AvatarImage src={mockUser.avatar} />
+              <AvatarImage src={mockUser.avatar} alt={mockUser.name} />
               <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black">
                 {mockUser.name.charAt(0)}
               </AvatarFallback>
@@ -131,7 +141,7 @@ export default function ProfileMenu({
             </button>
 
             <button
-              onClick={() => handleFeatureClick("Jobs")}
+              onClick={() => onNavigateToJobs ? handleNavigation(onNavigateToJobs) : handleFeatureClick("Jobs")}
               className="w-full px-4 py-3 flex items-center gap-3 text-foreground dark:hover:bg-zinc-900 light:hover:bg-gray-100 transition-colors"
             >
               <Briefcase className="w-5 h-5" />
@@ -139,7 +149,7 @@ export default function ProfileMenu({
             </button>
 
             <button
-              onClick={() => handleFeatureClick("Lists")}
+              onClick={() => onNavigateToLists ? handleNavigation(onNavigateToLists) : handleFeatureClick("Lists")}
               className="w-full px-4 py-3 flex items-center gap-3 text-foreground dark:hover:bg-zinc-900 light:hover:bg-gray-100 transition-colors"
             >
               <List className="w-5 h-5" />
@@ -147,7 +157,7 @@ export default function ProfileMenu({
             </button>
 
             <button
-              onClick={() => handleFeatureClick("Spaces")}
+              onClick={() => onNavigateToSpaces ? handleNavigation(onNavigateToSpaces) : handleFeatureClick("Spaces")}
               className="w-full px-4 py-3 flex items-center gap-3 text-foreground dark:hover:bg-zinc-900 light:hover:bg-gray-100 transition-colors"
             >
               <Radio className="w-5 h-5" />

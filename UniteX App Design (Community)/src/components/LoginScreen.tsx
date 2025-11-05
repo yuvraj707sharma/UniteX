@@ -4,12 +4,15 @@ import { Mail } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { validateEmail } from '../utils/sanitize';
+import { supabase } from '../lib/supabase';
+import { toast } from 'sonner';
 
 interface LoginScreenProps {
   onLogin: () => void;
+  onNeedsOnboarding: (email: string) => void;
 }
 
-export default function LoginScreen({ onLogin }: LoginScreenProps) {
+export default function LoginScreen({ onLogin, onNeedsOnboarding }: LoginScreenProps) {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -42,10 +45,46 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
 
       setIsLoading(true);
       
-      // Simulate authentication delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Check if user exists
+      const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .eq('email', email)
+        .single();
       
-      onLogin();
+      if (existingUser) {
+        // User exists, sign them in
+        const { error: signInError } = await supabase.auth.signInWithOtp({
+          email: email,
+          options: {
+            shouldCreateUser: false
+          }
+        });
+        
+        if (signInError) {
+          setError('Failed to send login link. Please try again.');
+          return;
+        }
+        
+        toast.success('Check your email for the login link!');
+        onLogin();
+      } else {
+        // New user, needs onboarding
+        const { error: signUpError } = await supabase.auth.signInWithOtp({
+          email: email,
+          options: {
+            shouldCreateUser: true
+          }
+        });
+        
+        if (signUpError) {
+          setError('Failed to create account. Please try again.');
+          return;
+        }
+        
+        toast.success('Check your email to verify your account!');
+        onNeedsOnboarding(email);
+      }
     } catch (error) {
       console.error('Login error:', error);
       setError("Login failed. Please try again.");

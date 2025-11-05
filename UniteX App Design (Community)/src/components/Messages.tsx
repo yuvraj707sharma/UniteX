@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import * as React from "react";
 import { Search, Settings, Edit, User } from "lucide-react";
+import { supabase } from "../lib/supabase";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Input } from "./ui/input";
@@ -9,53 +10,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import ChatConversation from "./ChatConversation";
 
-const mockChats = [
-  {
-    id: 1,
-    name: "Sydney Sweeny",
-    username: "sydneysweeny",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sydney",
-    lastMessage: "That sounds great! When can we meet?",
-    timestamp: "2h",
-    unread: true,
-  },
-  {
-    id: 2,
-    name: "Simran",
-    username: "simran",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Simran",
-    lastMessage: "Thanks for the collaboration opportunity!",
-    timestamp: "5h",
-    unread: false,
-  },
-  {
-    id: 3,
-    name: "Dheemant Agarwal",
-    username: "dheemant",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Dheemant",
-    lastMessage: "I'd love to help with the legal aspects",
-    timestamp: "1d",
-    unread: true,
-  },
-  {
-    id: 4,
-    name: "Deepak",
-    username: "deepak",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Deepak",
-    lastMessage: "Check out the new designs I sent",
-    timestamp: "2d",
-    unread: false,
-  },
-  {
-    id: 5,
-    name: "Yuvraj",
-    username: "yuvraj",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Yuvraj",
-    lastMessage: "Perfect! Let's start next week",
-    timestamp: "3d",
-    unread: false,
-  },
-];
+
 
 interface MessagesProps {
   initialChat?: {
@@ -72,14 +27,108 @@ export default function Messages({ initialChat, onClearUnread, onChatStateChange
     name: string;
     username: string;
     avatar: string;
+    id: string;
   } | null>(initialChat || null);
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showNewMessageDialog, setShowNewMessageDialog] = useState(false);
+  const [searchUsername, setSearchUsername] = useState("");
 
   // Notify parent when chat state changes
   React.useEffect(() => {
     onChatStateChange?.(!!selectedChat);
   }, [selectedChat, onChatStateChange]);
-  const [showNewMessageDialog, setShowNewMessageDialog] = useState(false);
-  const [searchUsername, setSearchUsername] = useState("");
+
+  useEffect(() => {
+    fetchConversations();
+  }, []);
+
+  const fetchConversations = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: messages, error } = await supabase
+        .from('messages')
+        .select(`
+          *,
+          sender:sender_id(id, full_name, username, avatar_url),
+          receiver:receiver_id(id, full_name, username, avatar_url)
+        `)
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const conversationMap = new Map();
+      messages?.forEach(message => {
+        const partnerId = message.sender_id === user.id ? message.receiver_id : message.sender_id;
+        const partner = message.sender_id === user.id ? message.receiver : message.sender;
+        
+        if (!conversationMap.has(partnerId)) {
+          conversationMap.set(partnerId, {
+            id: partnerId,
+            name: partner.full_name,
+            username: partner.username,
+            avatar: partner.avatar_url,
+            lastMessage: message.content,
+            timestamp: message.created_at,
+            unread: !message.is_read && message.receiver_id === user.id
+          });
+        }
+      });
+
+      setConversations(Array.from(conversationMap.values()));
+    } catch (error) {
+      console.error('Error fetching conversations:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const searchUsers = async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, username, avatar_url, department')
+        .or(`full_name.ilike.%${query}%,username.ilike.%${query}%`)
+        .limit(10);
+
+      if (error) throw error;
+      setSearchResults(data || []);
+    } catch (error) {
+      console.error('Error searching users:', error);
+    }
+  };
+
+  const startConversation = (user: any) => {
+    setSelectedChat({
+      id: user.id,
+      name: user.full_name,
+      username: user.username,
+      avatar: user.avatar_url
+    });
+    setShowNewMessageDialog(false);
+    setSearchUsername("");
+    setSearchResults([]);
+  };
+
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 1) return 'now';
+    if (diffInHours < 24) return `${diffInHours}h`;
+    const diffInDays = Math.floor(diffInHours / 24);
+    return `${diffInDays}d`;
+  };
 
   if (selectedChat) {
     return (
@@ -126,7 +175,7 @@ export default function Messages({ initialChat, onClearUnread, onChatStateChange
         animate={{ opacity: 1 }}
         transition={{ duration: 0.3 }}
       >
-        {mockChats.map((chat, index) => (
+        {conversations.map((chat, index) => (
           <motion.button
             key={chat.id}
             initial={{ opacity: 0, y: 20 }}
@@ -134,6 +183,7 @@ export default function Messages({ initialChat, onClearUnread, onChatStateChange
             transition={{ delay: index * 0.05 }}
             onClick={() =>
               setSelectedChat({
+                id: chat.id,
                 name: chat.name,
                 username: chat.username,
                 avatar: chat.avatar,
@@ -156,7 +206,7 @@ export default function Messages({ initialChat, onClearUnread, onChatStateChange
                   <span className="text-foreground truncate">{chat.name}</span>
                   <span className="text-muted-foreground text-sm">@{chat.username}</span>
                 </div>
-                <span className="text-muted-foreground text-sm flex-shrink-0">{chat.timestamp}</span>
+                <span className="text-muted-foreground text-sm flex-shrink-0">{formatTimeAgo(chat.timestamp)}</span>
               </div>
               <p className={`text-sm truncate ${chat.unread ? "text-foreground" : "text-muted-foreground"}`}>
                 {chat.lastMessage}
@@ -171,13 +221,26 @@ export default function Messages({ initialChat, onClearUnread, onChatStateChange
         ))}
       </motion.div>
 
-      {/* Empty State Alternative (if no messages) */}
-      {mockChats.length === 0 && (
+      {/* Loading State */}
+      {loading && (
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center space-y-4">
+            <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
+            <p className="text-muted-foreground">Loading conversations...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!loading && conversations.length === 0 && (
         <div className="flex items-center justify-center h-96">
           <div className="text-center space-y-4">
             <div className="text-6xl mb-4">💬</div>
-            <h2 className="text-white text-xl">No messages yet</h2>
-            <p className="text-zinc-400">Start a conversation with your collaborators</p>
+            <h2 className="text-foreground text-xl">No messages yet</h2>
+            <p className="text-muted-foreground">Start a conversation with your collaborators</p>
+            <Button onClick={() => setShowNewMessageDialog(true)} className="mt-4">
+              Start Chatting
+            </Button>
           </div>
         </div>
       )}
@@ -197,32 +260,32 @@ export default function Messages({ initialChat, onClearUnread, onChatStateChange
               <Input
                 placeholder="Search username..."
                 value={searchUsername}
-                onChange={(e) => setSearchUsername(e.target.value)}
+                onChange={(e) => {
+                  setSearchUsername(e.target.value);
+                  searchUsers(e.target.value);
+                }}
                 className="pl-10 dark:bg-zinc-800 light:bg-gray-100 dark:border-zinc-700 light:border-gray-300"
               />
             </div>
             
-            {/* Suggested Users */}
+            {/* Search Results */}
             <div className="space-y-2 max-h-60 overflow-y-auto">
-              {["Sarah Johnson", "Mike Chen", "Emma Davis"].map((user) => (
+              <p className="text-muted-foreground text-sm px-2">Search Results</p>
+              {searchResults.map((user) => (
                 <button
-                  key={user}
-                  onClick={() => {
-                    toast.success(`Starting conversation with ${user}`);
-                    setShowNewMessageDialog(false);
-                    setSearchUsername("");
-                  }}
+                  key={user.id}
+                  onClick={() => startConversation(user)}
                   className="w-full flex items-center gap-3 p-3 rounded-xl dark:hover:bg-zinc-800 light:hover:bg-gray-100 transition-colors"
                 >
                   <Avatar className="w-10 h-10">
-                    <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user}`} />
+                    <AvatarImage src={user.avatar_url} />
                     <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black">
-                      {user.charAt(0)}
+                      {user.full_name.charAt(0)}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="text-left">
-                    <p className="text-foreground">{user}</p>
-                    <p className="text-muted-foreground text-sm">@{user.toLowerCase().replace(" ", "")}</p>
+                  <div className="text-left flex-1">
+                    <p className="text-foreground">{user.full_name}</p>
+                    <p className="text-muted-foreground text-sm">@{user.username} • {user.department}</p>
                   </div>
                 </button>
               ))}

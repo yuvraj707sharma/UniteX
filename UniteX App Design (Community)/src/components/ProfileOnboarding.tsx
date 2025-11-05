@@ -7,6 +7,7 @@ import { Textarea } from './ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Badge } from './ui/badge';
 import { toast } from 'sonner';
+import { supabase } from '../lib/supabase';
 
 interface ProfileOnboardingProps {
   onComplete: (profileData: any) => void;
@@ -97,9 +98,40 @@ export default function ProfileOnboarding({ onComplete, userEmail }: ProfileOnbo
         profileData.username = emailUsername;
       }
 
-      await onComplete(profileData);
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Please verify your email first');
+        return;
+      }
+
+      // Create profile in database
+      const { error } = await supabase
+        .from('profiles')
+        .upsert({
+          id: user.id,
+          email: userEmail,
+          full_name: profileData.full_name,
+          username: profileData.username,
+          department: profileData.department,
+          year_of_study: parseInt(profileData.year.split(' ')[0]) || 1,
+          bio: profileData.bio || null,
+          skills: profileData.skills,
+          portfolio_url: profileData.website || null,
+          is_faculty: false,
+          account_status: 'active'
+        });
+
+      if (error) {
+        console.error('Profile creation error:', error);
+        toast.error('Failed to create profile. Please try again.');
+        return;
+      }
+
       toast.success('Profile created successfully!');
+      onComplete(profileData);
     } catch (error) {
+      console.error('Profile completion error:', error);
       toast.error('Failed to create profile. Please try again.');
     } finally {
       setIsLoading(false);

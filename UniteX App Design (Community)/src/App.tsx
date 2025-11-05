@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Toaster } from "./components/ui/sonner";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import LoginScreen from "./components/LoginScreen";
+import ProfileOnboarding from "./components/ProfileOnboarding";
 import HomeFeed from "./components/HomeFeed";
+import { supabase } from "./lib/supabase";
 import ProjectCollaboration from "./components/ProjectCollaboration";
 import Communities from "./components/Communities";
 import Notifications from "./components/Notifications";
@@ -21,6 +23,7 @@ import BottomNav from "./components/BottomNav";
 
 type Screen =
   | "login"
+  | "onboarding"
   | "home"
   | "search"
   | "communities"
@@ -39,6 +42,48 @@ type Screen =
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>("login");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  
+  // Check authentication state on app load
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setIsLoggedIn(true);
+        setUserEmail(session.user.email || "");
+        checkUserProfile(session.user.id);
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        setIsLoggedIn(true);
+        setUserEmail(session.user.email || "");
+        checkUserProfile(session.user.id);
+      } else {
+        setIsLoggedIn(false);
+        setCurrentScreen("login");
+        setCurrentUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const checkUserProfile = async (userId: string) => {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    
+    if (profile && profile.full_name) {
+      setCurrentUser(profile);
+      setCurrentScreen("home");
+    } else {
+      setCurrentScreen("onboarding");
+    }
+  };
   const [unreadNotifications, setUnreadNotifications] = useState(3);
   const [unreadMessages, setUnreadMessages] = useState(2);
   const [selectedUsername, setSelectedUsername] = useState("");
@@ -53,7 +98,16 @@ export default function App() {
   const [isInChatConversation, setIsInChatConversation] = useState(false);
 
   const handleLogin = () => {
-    setIsLoggedIn(true);
+    // Login is handled by auth state change
+  };
+
+  const handleNeedsOnboarding = (email: string) => {
+    setUserEmail(email);
+    setCurrentScreen("onboarding");
+  };
+
+  const handleOnboardingComplete = (profileData: any) => {
+    setCurrentUser(profileData);
     setCurrentScreen("home");
   };
 
@@ -147,7 +201,9 @@ export default function App() {
     try {
       switch (currentScreen) {
       case "login":
-        return <LoginScreen onLogin={handleLogin} />;
+        return <LoginScreen onLogin={handleLogin} onNeedsOnboarding={handleNeedsOnboarding} />;
+      case "onboarding":
+        return <ProfileOnboarding onComplete={handleOnboardingComplete} userEmail={userEmail} />;
       case "home":
         return (
           <HomeFeed

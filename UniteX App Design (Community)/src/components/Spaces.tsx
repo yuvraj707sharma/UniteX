@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { supabase } from "../lib/supabase";
+import SpaceRoom from "./SpaceRoom";
 
 const mockSpaces = [
   {
@@ -51,8 +52,31 @@ interface SpacesProps {
 }
 
 export default function Spaces({ onBack }: SpacesProps) {
-  const [spaces, setSpaces] = useState(mockSpaces);
+  const [spaces, setSpaces] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchSpaces();
+  }, []);
+
+  const fetchSpaces = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('spaces')
+        .select('*, profiles(full_name, username)')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setSpaces(data || []);
+    } catch (error) {
+      console.error('Error fetching spaces:', error);
+      setSpaces(mockSpaces);
+    } finally {
+      setLoading(false);
+    }
+  };
   const [showCreateSpace, setShowCreateSpace] = useState(false);
+  const [joinedSpace, setJoinedSpace] = useState<any>(null);
   const [spaceForm, setSpaceForm] = useState({
     title: "",
     description: "",
@@ -60,8 +84,50 @@ export default function Spaces({ onBack }: SpacesProps) {
     scheduled_for: ""
   });
 
-  const handleJoinSpace = (spaceTitle: string) => {
-    toast.success(`Joined ${spaceTitle}!`);
+  const handleJoinSpace = async (space: any) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Please log in to join space');
+        return;
+      }
+
+      // Check if already a member
+      const { data: existingMember } = await supabase
+        .from('space_members')
+        .select('id')
+        .eq('space_id', space.id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (existingMember) {
+        toast.info('You are already a member of this space');
+        return;
+      }
+
+      // Add user to space
+      const { error } = await supabase
+        .from('space_members')
+        .insert({
+          space_id: space.id,
+          user_id: user.id,
+          role: 'member'
+        });
+
+      if (error) throw error;
+
+      // Update member count
+      await supabase
+        .from('spaces')
+        .update({ member_count: (space.member_count || 0) + 1 })
+        .eq('id', space.id);
+
+      toast.success(`Joined ${space.name}!`);
+      setJoinedSpace(space);
+    } catch (error) {
+      console.error('Error joining space:', error);
+      toast.error('Failed to join space');
+    }
   };
 
   const handleCreateSpace = async () => {
@@ -75,12 +141,10 @@ export default function Spaces({ onBack }: SpacesProps) {
       const { error } = await supabase
         .from('spaces')
         .insert({
-          user_id: user.id,
-          title: spaceForm.title,
+          created_by: user.id,
+          name: spaceForm.title,
           description: spaceForm.description,
-          topic: spaceForm.topic,
-          scheduled_for: spaceForm.scheduled_for || null,
-          status: spaceForm.scheduled_for ? 'scheduled' : 'live'
+          topic: spaceForm.topic
         });
 
       if (error) throw error;
@@ -88,11 +152,22 @@ export default function Spaces({ onBack }: SpacesProps) {
       toast.success('Space created successfully!');
       setShowCreateSpace(false);
       setSpaceForm({ title: "", description: "", topic: "", scheduled_for: "" });
+      fetchSpaces();
     } catch (error) {
       console.error('Error creating space:', error);
       toast.error('Failed to create space');
     }
   };
+
+  // Show SpaceRoom if user joined a space
+  if (joinedSpace) {
+    return (
+      <SpaceRoom 
+        space={joinedSpace} 
+        onLeave={() => setJoinedSpace(null)} 
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background pb-20 max-w-md mx-auto">
@@ -119,15 +194,16 @@ export default function Spaces({ onBack }: SpacesProps) {
         transition={{ duration: 0.3 }}
         className="p-4 space-y-4"
       >
-        {/* Live Spaces */}
-        <div>
-          <h2 className="text-foreground mb-3 flex items-center gap-2">
-            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-            Live Now
-          </h2>
-          {mockSpaces
-            .filter((space) => space.status === "live")
-            .map((space, index) => (
+        {loading ? (
+          <div className="flex items-center justify-center h-96">
+            <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full"></div>
+          </div>
+        ) : (
+          <>
+            {/* All Spaces */}
+            <div>
+              <h2 className="text-foreground mb-3">Community Spaces</h2>
+              {spaces.length > 0 ? spaces.map((space, index) => (
               <motion.div
                 key={space.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -137,87 +213,52 @@ export default function Spaces({ onBack }: SpacesProps) {
               >
                 <div className="space-y-3">
                   <div className="flex items-start gap-3">
-                    <Avatar className="w-12 h-12 border-2 dark:border-purple-500 light:border-red-500">
-                      <AvatarImage src={space.host.avatar} />
+                    <Avatar className="w-12 h-12">
                       <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black">
-                        {space.host.name.charAt(0)}
+                        {space.profiles?.full_name?.charAt(0) || 'S'}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
-                      <p className="text-muted-foreground text-sm">{space.host.name}</p>
-                      <h3 className="text-foreground">{space.title}</h3>
+                      <p className="text-muted-foreground text-sm">{space.profiles?.full_name || 'Anonymous'}</p>
+                      <h3 className="text-foreground">{space.name}</h3>
                     </div>
-                    <Badge className="bg-red-500/10 text-red-500 border-red-500/20">
-                      <Radio className="w-3 h-3 mr-1" />
-                      LIVE
-                    </Badge>
                   </div>
 
+                  {space.description && (
+                    <p className="text-muted-foreground text-sm">{space.description}</p>
+                  )}
+                  
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <Users className="w-4 h-4" />
-                      <span>{space.listeners} listening</span>
+                      <span>{space.member_count || 0} members</span>
                     </div>
-                    <Badge className="dark:bg-zinc-800 light:bg-white dark:text-zinc-300 light:text-gray-700 dark:border-zinc-700 light:border-gray-300 text-xs">
-                      {space.topic}
-                    </Badge>
+                    {space.topic && (
+                      <Badge className="dark:bg-zinc-800 light:bg-white dark:text-zinc-300 light:text-gray-700 dark:border-zinc-700 light:border-gray-300 text-xs">
+                        {space.topic}
+                      </Badge>
+                    )}
                   </div>
 
                   <Button
-                    onClick={() => handleJoinSpace(space.title)}
+                    onClick={() => handleJoinSpace(space)}
                     className="w-full dark:bg-purple-500 dark:hover:bg-purple-600 light:bg-red-600 light:hover:bg-red-700 text-white rounded-full"
                   >
-                    <Play className="w-4 h-4 mr-2" />
+                    <Users className="w-4 h-4 mr-2" />
                     Join Space
                   </Button>
                 </div>
               </motion.div>
-            ))}
-        </div>
-
-        {/* Scheduled Spaces */}
-        <div>
-          <h2 className="text-foreground mb-3">Scheduled</h2>
-          {mockSpaces
-            .filter((space) => space.status === "scheduled")
-            .map((space, index) => (
-              <motion.div
-                key={space.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="dark:bg-zinc-900 light:bg-gray-50 rounded-2xl p-4 border dark:border-zinc-800 light:border-gray-200 mb-3"
-              >
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3">
-                    <Avatar className="w-12 h-12">
-                      <AvatarImage src={space.host.avatar} />
-                      <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black">
-                        {space.host.name.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <p className="text-muted-foreground text-sm">{space.host.name}</p>
-                      <h3 className="text-foreground">{space.title}</h3>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Clock className="w-4 h-4" />
-                    <span>{space.scheduledFor}</span>
-                  </div>
-
-                  <Button
-                    onClick={() => toast.success("Reminder set!")}
-                    variant="outline"
-                    className="w-full dark:border-zinc-700 dark:text-white dark:hover:bg-zinc-800 light:border-gray-300 light:text-black light:hover:bg-gray-100 rounded-full"
-                  >
-                    Set Reminder
-                  </Button>
+              )) : (
+                <div className="text-center py-8">
+                  <div className="text-4xl mb-4">🎙️</div>
+                  <h3 className="text-foreground text-lg mb-2">No spaces yet</h3>
+                  <p className="text-muted-foreground">Be the first to create a space!</p>
                 </div>
-              </motion.div>
-            ))}
-        </div>
+              )}
+            </div>
+          </>
+        )}
       </motion.div>
 
       {/* Create Space Dialog */}
@@ -273,6 +314,8 @@ export default function Spaces({ onBack }: SpacesProps) {
           </div>
         </DialogContent>
       </Dialog>
+
+
     </div>
   );
 }

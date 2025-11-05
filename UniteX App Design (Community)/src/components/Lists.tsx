@@ -39,7 +39,29 @@ interface ListsProps {
 }
 
 export default function Lists({ onBack }: ListsProps) {
-  const [lists, setLists] = useState(mockLists);
+  const [lists, setLists] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchLists();
+  }, []);
+
+  const fetchLists = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('lists')
+        .select('*, profiles(full_name, username)')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setLists(data || []);
+    } catch (error) {
+      console.error('Error fetching lists:', error);
+      setLists(mockLists);
+    } finally {
+      setLoading(false);
+    }
+  };
   const [showCreateList, setShowCreateList] = useState(false);
   const [showExploreList, setShowExploreList] = useState(false);
   const [selectedList, setSelectedList] = useState<any>(null);
@@ -71,6 +93,7 @@ export default function Lists({ onBack }: ListsProps) {
       toast.success('List created successfully!');
       setShowCreateList(false);
       setListForm({ name: "", description: "", is_private: false });
+      fetchLists();
     } catch (error) {
       console.error('Error creating list:', error);
       toast.error('Failed to create list');
@@ -112,7 +135,11 @@ export default function Lists({ onBack }: ListsProps) {
         transition={{ duration: 0.3 }}
         className="p-4 space-y-3"
       >
-        {lists.map((list, index) => (
+        {loading ? (
+          <div className="flex items-center justify-center h-96">
+            <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full"></div>
+          </div>
+        ) : lists.length > 0 ? lists.map((list, index) => (
           <motion.div
             key={list.id}
             initial={{ opacity: 0, y: 20 }}
@@ -128,15 +155,15 @@ export default function Lists({ onBack }: ListsProps) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <h3 className="text-foreground">{list.name}</h3>
-                  {list.isPrivate ? (
+                  {list.is_private ? (
                     <Lock className="w-4 h-4 text-muted-foreground" />
                   ) : (
                     <Globe className="w-4 h-4 text-muted-foreground" />
                   )}
                 </div>
-                <p className="text-muted-foreground text-sm mb-2">{list.description}</p>
+                <p className="text-muted-foreground text-sm mb-2">{list.description || 'No description'}</p>
                 <Badge className="dark:bg-zinc-800 light:bg-gray-200 dark:text-zinc-300 light:text-gray-700 dark:border-zinc-700 light:border-gray-300 text-xs">
-                  {list.memberCount} members
+                  {list.members_count || 0} members
                 </Badge>
               </div>
 
@@ -166,7 +193,13 @@ export default function Lists({ onBack }: ListsProps) {
               </DropdownMenu>
             </div>
           </motion.div>
-        ))}
+        )) : (
+          <div className="text-center py-8">
+            <div className="text-4xl mb-4">📝</div>
+            <h3 className="text-foreground text-lg mb-2">No lists yet</h3>
+            <p className="text-muted-foreground">Create your first list to organize people!</p>
+          </div>
+        )}
       </motion.div>
 
       {/* Create New List Button */}
@@ -267,11 +300,16 @@ export default function Lists({ onBack }: ListsProps) {
             <div className="text-center py-8">
               <div className="text-4xl mb-4">👥</div>
               <p className="text-muted-foreground">
-                {selectedList?.memberCount} members in this list
+                {selectedList?.members_count || 0} members in this list
               </p>
-              <p className="text-sm text-muted-foreground mt-2">
-                Member management coming soon!
-              </p>
+              <div className="mt-4 p-4 dark:bg-zinc-800 light:bg-gray-100 rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  Created by: {selectedList?.profiles?.full_name || 'Unknown'}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Privacy: {selectedList?.is_private ? 'Private' : 'Public'}
+                </p>
+              </div>
             </div>
             
             <Button

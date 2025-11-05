@@ -591,14 +591,14 @@ export default function PostCard({
               <Button
                 onClick={() => setShowQuoteDialog(false)}
                 variant="outline"
-                className="flex-1 dark:border-zinc-700 light:border-gray-300"
+                className="flex-1 dark:border-zinc-700 light:border-gray-300 dark:text-white light:text-black dark:hover:bg-zinc-800 light:hover:bg-gray-100"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleQuoteRepost}
                 disabled={!quoteText.trim()}
-                className="flex-1 dark:bg-green-600 dark:hover:bg-green-700 light:bg-green-600 light:hover:bg-green-700 text-white"
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Quote Post
               </Button>

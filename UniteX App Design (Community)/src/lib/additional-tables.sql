@@ -109,44 +109,78 @@ ALTER TABLE space_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE premium_subscriptions ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies for new tables
--- Jobs: Everyone can read, users can create/update their own
-CREATE POLICY "Jobs are viewable by everyone" ON jobs FOR SELECT USING (true);
-CREATE POLICY "Users can create jobs" ON jobs FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own jobs" ON jobs FOR UPDATE USING (auth.uid() = user_id);
+-- RLS Policies for new tables (skip if exists)
+DO $$ 
+BEGIN
+  -- Jobs policies
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'jobs' AND policyname = 'Jobs are viewable by everyone') THEN
+    CREATE POLICY "Jobs are viewable by everyone" ON jobs FOR SELECT USING (true);
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'jobs' AND policyname = 'Users can create jobs') THEN
+    CREATE POLICY "Users can create jobs" ON jobs FOR INSERT WITH CHECK (auth.uid() = user_id);
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'jobs' AND policyname = 'Users can update own jobs') THEN
+    CREATE POLICY "Users can update own jobs" ON jobs FOR UPDATE USING (auth.uid() = user_id);
+  END IF;
 
--- Job Applications: Users can see applications for their jobs or their own applications
-CREATE POLICY "Users can view relevant job applications" ON job_applications 
-FOR SELECT USING (
-  auth.uid() = user_id OR 
-  auth.uid() IN (SELECT user_id FROM jobs WHERE id = job_id)
-);
-CREATE POLICY "Users can create job applications" ON job_applications 
-FOR INSERT WITH CHECK (auth.uid() = user_id);
+  -- Job Applications policies
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'job_applications' AND policyname = 'Users can view relevant job applications') THEN
+    CREATE POLICY "Users can view relevant job applications" ON job_applications 
+    FOR SELECT USING (
+      auth.uid() = user_id OR 
+      auth.uid() IN (SELECT user_id FROM jobs WHERE id = job_id)
+    );
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'job_applications' AND policyname = 'Users can create job applications') THEN
+    CREATE POLICY "Users can create job applications" ON job_applications 
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+  END IF;
 
--- Lists: Public lists viewable by all, private lists only by owner/members
-CREATE POLICY "Public lists are viewable by everyone" ON lists 
-FOR SELECT USING (is_private = false OR auth.uid() = user_id);
-CREATE POLICY "Users can create lists" ON lists 
-FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own lists" ON lists 
-FOR UPDATE USING (auth.uid() = user_id);
+  -- Lists policies
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'lists' AND policyname = 'Public lists are viewable by everyone') THEN
+    CREATE POLICY "Public lists are viewable by everyone" ON lists 
+    FOR SELECT USING (is_private = false OR auth.uid() = user_id);
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'lists' AND policyname = 'Users can create lists') THEN
+    CREATE POLICY "Users can create lists" ON lists 
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'lists' AND policyname = 'Users can update own lists') THEN
+    CREATE POLICY "Users can update own lists" ON lists 
+    FOR UPDATE USING (auth.uid() = user_id);
+  END IF;
 
--- Messages: Users can only see their own conversations
-CREATE POLICY "Users can view their own messages" ON messages 
-FOR SELECT USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
-CREATE POLICY "Users can send messages" ON messages 
-FOR INSERT WITH CHECK (auth.uid() = sender_id);
-CREATE POLICY "Users can update their received messages" ON messages 
-FOR UPDATE USING (auth.uid() = receiver_id);
+  -- Messages policies
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'messages' AND policyname = 'Users can view their own messages') THEN
+    CREATE POLICY "Users can view their own messages" ON messages 
+    FOR SELECT USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'messages' AND policyname = 'Users can send messages') THEN
+    CREATE POLICY "Users can send messages" ON messages 
+    FOR INSERT WITH CHECK (auth.uid() = sender_id);
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'messages' AND policyname = 'Users can update their received messages') THEN
+    CREATE POLICY "Users can update their received messages" ON messages 
+    FOR UPDATE USING (auth.uid() = receiver_id);
+  END IF;
 
--- Premium subscriptions: Users can only see their own subscriptions
-CREATE POLICY "Users can view own subscriptions" ON premium_subscriptions 
-FOR SELECT USING (auth.uid() = user_id);
+  -- Premium subscriptions policies
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'premium_subscriptions' AND policyname = 'Users can view own subscriptions') THEN
+    CREATE POLICY "Users can view own subscriptions" ON premium_subscriptions 
+    FOR SELECT USING (auth.uid() = user_id);
+  END IF;
+END $$;
 
--- Create indexes for performance
-CREATE INDEX idx_jobs_user_created ON jobs(user_id, created_at DESC);
-CREATE INDEX idx_jobs_type_location ON jobs(type, location);
-CREATE INDEX idx_job_applications_job_user ON job_applications(job_id, user_id);
-CREATE INDEX idx_messages_conversation ON messages(sender_id, receiver_id, created_at DESC);
-CREATE INDEX idx_messages_unread ON messages(receiver_id, is_read, created_at DESC);
+-- Create indexes for performance (skip if exists)
+CREATE INDEX IF NOT EXISTS idx_jobs_user_created ON jobs(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_jobs_type_location ON jobs(type, location);
+CREATE INDEX IF NOT EXISTS idx_job_applications_job_user ON job_applications(job_id, user_id);
+CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(sender_id, receiver_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_unread ON messages(receiver_id, is_read, created_at DESC);

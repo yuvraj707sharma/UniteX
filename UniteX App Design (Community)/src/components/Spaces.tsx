@@ -1,9 +1,14 @@
-import { ArrowLeft, Radio, Users, Clock, Play } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ArrowLeft, Radio, Users, Clock, Play, Plus } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Textarea } from "./ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { supabase } from "../lib/supabase";
 
 const mockSpaces = [
   {
@@ -46,12 +51,47 @@ interface SpacesProps {
 }
 
 export default function Spaces({ onBack }: SpacesProps) {
+  const [spaces, setSpaces] = useState(mockSpaces);
+  const [showCreateSpace, setShowCreateSpace] = useState(false);
+  const [spaceForm, setSpaceForm] = useState({
+    title: "",
+    description: "",
+    topic: "",
+    scheduled_for: ""
+  });
+
   const handleJoinSpace = (spaceTitle: string) => {
     toast.success(`Joined ${spaceTitle}!`);
   };
 
-  const handleCreateSpace = () => {
-    toast.success("Create space feature coming soon!");
+  const handleCreateSpace = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Please log in to create a space');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('spaces')
+        .insert({
+          user_id: user.id,
+          title: spaceForm.title,
+          description: spaceForm.description,
+          topic: spaceForm.topic,
+          scheduled_for: spaceForm.scheduled_for || null,
+          status: spaceForm.scheduled_for ? 'scheduled' : 'live'
+        });
+
+      if (error) throw error;
+
+      toast.success('Space created successfully!');
+      setShowCreateSpace(false);
+      setSpaceForm({ title: "", description: "", topic: "", scheduled_for: "" });
+    } catch (error) {
+      console.error('Error creating space:', error);
+      toast.error('Failed to create space');
+    }
   };
 
   return (
@@ -66,8 +106,8 @@ export default function Spaces({ onBack }: SpacesProps) {
             <h1 className="text-foreground text-xl">Spaces</h1>
             <p className="text-muted-foreground text-sm">Audio conversations</p>
           </div>
-          <button onClick={handleCreateSpace}>
-            <Radio className="w-6 h-6 dark:text-blue-500 light:text-red-600" />
+          <button onClick={() => setShowCreateSpace(true)}>
+            <Plus className="w-6 h-6 dark:text-blue-500 light:text-red-600" />
           </button>
         </div>
       </div>
@@ -179,6 +219,60 @@ export default function Spaces({ onBack }: SpacesProps) {
             ))}
         </div>
       </motion.div>
+
+      {/* Create Space Dialog */}
+      <Dialog open={showCreateSpace} onOpenChange={setShowCreateSpace}>
+        <DialogContent className="dark:bg-zinc-900 dark:border-zinc-800 light:bg-white light:border-gray-200 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Create a Space</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Start an audio conversation
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <Input
+              placeholder="Space Title"
+              value={spaceForm.title}
+              onChange={(e) => setSpaceForm({...spaceForm, title: e.target.value})}
+            />
+            <Textarea
+              placeholder="Description"
+              value={spaceForm.description}
+              onChange={(e) => setSpaceForm({...spaceForm, description: e.target.value})}
+              className="min-h-[80px]"
+            />
+            <Input
+              placeholder="Topic (e.g., AI, Startup, Design)"
+              value={spaceForm.topic}
+              onChange={(e) => setSpaceForm({...spaceForm, topic: e.target.value})}
+            />
+            <Input
+              type="datetime-local"
+              placeholder="Schedule for later (optional)"
+              value={spaceForm.scheduled_for}
+              onChange={(e) => setSpaceForm({...spaceForm, scheduled_for: e.target.value})}
+            />
+            
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setShowCreateSpace(false)}
+                variant="outline"
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateSpace}
+                disabled={!spaceForm.title || !spaceForm.description}
+                className="flex-1 dark:bg-purple-500 dark:hover:bg-purple-600 light:bg-red-600 light:hover:bg-red-700 text-white"
+              >
+                Create Space
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

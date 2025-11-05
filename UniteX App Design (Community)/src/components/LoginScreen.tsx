@@ -20,7 +20,7 @@ export default function LoginScreen({ onLogin, onNeedsOnboarding }: LoginScreenP
 
 
   const isValidUniversityEmail = (email: string): boolean => {
-    const validDomains = ['.edu', '.ac.', '.edu.'];
+    const validDomains = ['@jecrcu.edu.in', '.edu', '.ac.', '.edu.'];
     return validDomains.some(domain => email.toLowerCase().includes(domain));
   };
 
@@ -39,7 +39,7 @@ export default function LoginScreen({ onLogin, onNeedsOnboarding }: LoginScreenP
       }
 
       if (!isValidUniversityEmail(email)) {
-        setError("Please use a valid university email (.edu domain)");
+        setError("Please use a valid university email (@jecrcu.edu.in or .edu domain)");
         return;
       }
 
@@ -160,7 +160,7 @@ export default function LoginScreen({ onLogin, onNeedsOnboarding }: LoginScreenP
         {/* Footer */}
         <div className="text-center text-muted-foreground text-sm space-y-2">
           <p>Only verified university emails are accepted</p>
-          <p className="text-xs">Example: @jecrc.edu, @college.edu</p>
+          <p className="text-xs">Example: @jecrcu.edu.in, @college.edu</p>
         </div>
       </motion.div>
     </div>

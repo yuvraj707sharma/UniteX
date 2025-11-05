@@ -129,7 +129,11 @@ export default function ProfileOnboarding({ onComplete, userEmail }: ProfileOnbo
       }
 
       toast.success('Profile created successfully!');
-      onComplete(profileData);
+      
+      // Wait a moment for the toast to show, then complete
+      setTimeout(() => {
+        onComplete(profileData);
+      }, 1000);
     } catch (error) {
       console.error('Profile completion error:', error);
       toast.error('Failed to create profile. Please try again.');

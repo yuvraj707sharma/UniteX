@@ -1,9 +1,14 @@
-import { useState } from "react";
-import { ArrowLeft, List, Plus, MoreVertical, Lock, Globe } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ArrowLeft, List, Plus, MoreVertical, Lock, Globe, Edit, Trash2, Eye } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Textarea } from "./ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { supabase } from "../lib/supabase";
 
 const mockLists = [
   {
@@ -35,14 +40,51 @@ interface ListsProps {
 
 export default function Lists({ onBack }: ListsProps) {
   const [lists, setLists] = useState(mockLists);
+  const [showCreateList, setShowCreateList] = useState(false);
+  const [showExploreList, setShowExploreList] = useState(false);
+  const [selectedList, setSelectedList] = useState<any>(null);
+  const [listForm, setListForm] = useState({
+    name: "",
+    description: "",
+    is_private: false
+  });
 
-  const handleCreateList = () => {
-    toast.success("Create list feature coming soon!");
+  const handleCreateList = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Please log in to create a list');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('lists')
+        .insert({
+          user_id: user.id,
+          name: listForm.name,
+          description: listForm.description,
+          is_private: listForm.is_private
+        });
+
+      if (error) throw error;
+
+      toast.success('List created successfully!');
+      setShowCreateList(false);
+      setListForm({ name: "", description: "", is_private: false });
+    } catch (error) {
+      console.error('Error creating list:', error);
+      toast.error('Failed to create list');
+    }
   };
 
   const handleDeleteList = (listId: number, listName: string) => {
     setLists((prev) => prev.filter((list) => list.id !== listId));
     toast.success(`Deleted ${listName}`);
+  };
+
+  const handleExploreList = (list: any) => {
+    setSelectedList(list);
+    setShowExploreList(true);
   };
 
   return (
@@ -57,7 +99,7 @@ export default function Lists({ onBack }: ListsProps) {
             <h1 className="text-foreground text-xl">Lists</h1>
             <p className="text-muted-foreground text-sm">{lists.length} lists</p>
           </div>
-          <button onClick={handleCreateList}>
+          <button onClick={() => setShowCreateList(true)}>
             <Plus className="w-6 h-6 dark:text-blue-500 light:text-red-600" />
           </button>
         </div>
@@ -98,12 +140,30 @@ export default function Lists({ onBack }: ListsProps) {
                 </Badge>
               </div>
 
-              <button
-                onClick={() => handleDeleteList(list.id, list.name)}
-                className="p-2 dark:hover:bg-zinc-800 light:hover:bg-gray-200 rounded-lg transition-colors"
-              >
-                <MoreVertical className="w-5 h-5 text-muted-foreground" />
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="p-2 dark:hover:bg-zinc-800 light:hover:bg-gray-200 rounded-lg transition-colors">
+                    <MoreVertical className="w-5 h-5 text-muted-foreground" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="dark:bg-zinc-900 dark:border-zinc-800 light:bg-white light:border-gray-200">
+                  <DropdownMenuItem onClick={() => handleExploreList(list)} className="dark:hover:bg-zinc-800 light:hover:bg-gray-100">
+                    <Eye className="w-4 h-4 mr-2" />
+                    Explore List
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="dark:hover:bg-zinc-800 light:hover:bg-gray-100">
+                    <Edit className="w-4 h-4 mr-2" />
+                    Edit List
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => handleDeleteList(list.id, list.name)}
+                    className="dark:hover:bg-zinc-800 light:hover:bg-gray-100 text-red-500"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete List
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </motion.div>
         ))}
@@ -112,7 +172,7 @@ export default function Lists({ onBack }: ListsProps) {
       {/* Create New List Button */}
       <div className="fixed bottom-24 right-4 max-w-md mx-auto">
         <Button
-          onClick={handleCreateList}
+          onClick={() => setShowCreateList(true)}
           className="w-14 h-14 dark:bg-blue-500 dark:hover:bg-blue-600 light:bg-red-600 light:hover:bg-red-700 text-white rounded-full shadow-lg"
         >
           <Plus className="w-6 h-6" />
@@ -129,7 +189,7 @@ export default function Lists({ onBack }: ListsProps) {
               Create lists to organize people and stay updated
             </p>
             <Button
-              onClick={handleCreateList}
+              onClick={() => setShowCreateList(true)}
               className="dark:bg-blue-500 dark:hover:bg-blue-600 light:bg-red-600 light:hover:bg-red-700 text-white rounded-full px-6"
             >
               Create a list
@@ -137,6 +197,92 @@ export default function Lists({ onBack }: ListsProps) {
           </div>
         </div>
       )}
+
+      {/* Create List Dialog */}
+      <Dialog open={showCreateList} onOpenChange={setShowCreateList}>
+        <DialogContent className="dark:bg-zinc-900 dark:border-zinc-800 light:bg-white light:border-gray-200 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Create a List</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Organize people you want to follow
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <Input
+              placeholder="List Name"
+              value={listForm.name}
+              onChange={(e) => setListForm({...listForm, name: e.target.value})}
+            />
+            <Textarea
+              placeholder="Description"
+              value={listForm.description}
+              onChange={(e) => setListForm({...listForm, description: e.target.value})}
+              className="min-h-[80px]"
+            />
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="private"
+                checked={listForm.is_private}
+                onChange={(e) => setListForm({...listForm, is_private: e.target.checked})}
+                className="rounded"
+              />
+              <label htmlFor="private" className="text-sm text-muted-foreground">
+                Make this list private
+              </label>
+            </div>
+            
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setShowCreateList(false)}
+                variant="outline"
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateList}
+                disabled={!listForm.name}
+                className="flex-1 dark:bg-blue-500 dark:hover:bg-blue-600 light:bg-red-600 light:hover:bg-red-700 text-white"
+              >
+                Create List
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Explore List Dialog */}
+      <Dialog open={showExploreList} onOpenChange={setShowExploreList}>
+        <DialogContent className="dark:bg-zinc-900 dark:border-zinc-800 light:bg-white light:border-gray-200 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">{selectedList?.name}</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              {selectedList?.description}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="text-center py-8">
+              <div className="text-4xl mb-4">👥</div>
+              <p className="text-muted-foreground">
+                {selectedList?.memberCount} members in this list
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Member management coming soon!
+              </p>
+            </div>
+            
+            <Button
+              onClick={() => setShowExploreList(false)}
+              className="w-full"
+            >
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

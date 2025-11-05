@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Toaster } from "./components/ui/sonner";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import LoginScreen from "./components/LoginScreen";
+import AuthDebug from "./components/AuthDebug";
 import ProfileOnboarding from "./components/ProfileOnboarding";
 import HomeFeed from "./components/HomeFeed";
 import { supabase } from "./lib/supabase";
@@ -71,16 +72,26 @@ export default function App() {
   }, []);
 
   const checkUserProfile = async (userId: string) => {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    
-    if (profile && profile.full_name) {
-      setCurrentUser(profile);
-      setCurrentScreen("home");
-    } else {
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching profile:', error);
+        return;
+      }
+      
+      if (profile && profile.full_name) {
+        setCurrentUser(profile);
+        setCurrentScreen("home");
+      } else {
+        setCurrentScreen("onboarding");
+      }
+    } catch (error) {
+      console.error('Profile check error:', error);
       setCurrentScreen("onboarding");
     }
   };
@@ -106,9 +117,29 @@ export default function App() {
     setCurrentScreen("onboarding");
   };
 
-  const handleOnboardingComplete = (profileData: any) => {
-    setCurrentUser(profileData);
-    setCurrentScreen("home");
+  const handleOnboardingComplete = async (profileData: any) => {
+    try {
+      // Fetch the complete profile from database
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        
+        if (profile) {
+          setCurrentUser(profile);
+        } else {
+          setCurrentUser(profileData);
+        }
+      }
+      setCurrentScreen("home");
+    } catch (error) {
+      console.error('Onboarding completion error:', error);
+      setCurrentUser(profileData);
+      setCurrentScreen("home");
+    }
   };
 
   const handleNavigate = (screen: string) => {
@@ -307,6 +338,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <div className="relative min-h-screen bg-background">
+        <AuthDebug />
         <Toaster position="top-center" />
         <AnimatePresence mode="wait">
           <motion.div

@@ -1,8 +1,13 @@
-import { ArrowLeft, Briefcase, MapPin, Clock, DollarSign } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ArrowLeft, Briefcase, MapPin, Clock, DollarSign, Plus } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Textarea } from "./ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { supabase } from "../lib/supabase";
 
 const mockJobs = [
   {
@@ -42,8 +47,137 @@ interface JobsProps {
 }
 
 export default function Jobs({ onBack }: JobsProps) {
-  const handleApply = (jobTitle: string) => {
-    toast.success(`Application submitted for ${jobTitle}!`);
+  const [jobs, setJobs] = useState<any[]>(mockJobs);
+  const [loading, setLoading] = useState(true);
+  const [showPostJob, setShowPostJob] = useState(false);
+  const [showApplyDialog, setShowApplyDialog] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<any>(null);
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [coverNote, setCoverNote] = useState("");
+  const [jobForm, setJobForm] = useState({
+    title: "",
+    company: "",
+    location: "",
+    type: "internship" as "internship" | "part-time" | "full-time" | "project",
+    salary: "",
+    description: "",
+    requirements: ""
+  });
+
+  useEffect(() => {
+    fetchJobs();
+  }, []);
+
+  const fetchJobs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('jobs')
+        .select('*, profiles(full_name, username)')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setJobs(data || mockJobs);
+    } catch (error) {
+      console.error('Error fetching jobs:', error);
+      setJobs(mockJobs);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePostJob = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Please log in to post a job');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('jobs')
+        .insert({
+          user_id: user.id,
+          title: jobForm.title,
+          company: jobForm.company,
+          location: jobForm.location,
+          type: jobForm.type,
+          salary: jobForm.salary || null,
+          description: jobForm.description,
+          requirements: jobForm.requirements || null
+        });
+
+      if (error) throw error;
+
+      toast.success('Job posted successfully!');
+      setShowPostJob(false);
+      setJobForm({
+        title: "",
+        company: "",
+        location: "",
+        type: "internship",
+        salary: "",
+        description: "",
+        requirements: ""
+      });
+      fetchJobs();
+    } catch (error) {
+      console.error('Error posting job:', error);
+      toast.error('Failed to post job');
+    }
+  };
+
+  const handleApplyClick = (job: any) => {
+    setSelectedJob(job);
+    setShowApplyDialog(true);
+  };
+
+  const handleApply = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Please log in to apply');
+        return;
+      }
+
+      if (!resumeFile) {
+        toast.error('Please upload your resume');
+        return;
+      }
+
+      // Upload resume file
+      const fileExt = resumeFile.name.split('.').pop();
+      const fileName = `${user.id}/${selectedJob.id}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('resumes')
+        .upload(fileName, resumeFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('resumes')
+        .getPublicUrl(fileName);
+
+      // Create application
+      const { error } = await supabase
+        .from('job_applications')
+        .insert({
+          job_id: selectedJob.id,
+          user_id: user.id,
+          resume_url: publicUrl,
+          cover_note: coverNote
+        });
+
+      if (error) throw error;
+
+      toast.success('Application submitted successfully!');
+      setShowApplyDialog(false);
+      setResumeFile(null);
+      setCoverNote("");
+    } catch (error) {
+      console.error('Error applying:', error);
+      toast.error('Failed to submit application');
+    }
   };
 
   return (
@@ -74,7 +208,7 @@ export default function Jobs({ onBack }: JobsProps) {
         transition={{ duration: 0.3 }}
         className="p-4 space-y-3"
       >
-        {mockJobs.map((job, index) => (
+        {jobs.map((job, index) => (
           <motion.div
             key={job.id}
             initial={{ opacity: 0, y: 20 }}
@@ -111,7 +245,7 @@ export default function Jobs({ onBack }: JobsProps) {
               </div>
 
               <Button
-                onClick={() => handleApply(job.title)}
+                onClick={() => handleApplyClick(job)}
                 className="w-full dark:bg-blue-500 dark:hover:bg-blue-600 light:bg-red-600 light:hover:bg-red-700 text-white rounded-full"
               >
                 Apply Now

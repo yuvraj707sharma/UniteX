@@ -142,9 +142,9 @@ CREATE TABLE comments (
 CREATE TABLE follows (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     follower_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
-    following_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+    followed_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(follower_id, following_id)
+    UNIQUE(follower_id, followed_id)
 );
 
 -- Project Collaborations

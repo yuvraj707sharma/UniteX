@@ -260,6 +260,16 @@ export default function Communities() {
               </div>
             </motion.div>
           ))}
+          {loadingMore && (
+            <div className="flex items-center justify-center py-4">
+              <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full"></div>
+            </div>
+          )}
+          {!hasMore && communities.length > 6 && (
+            <div className="text-center py-4 text-muted-foreground text-sm">
+              All communities loaded!
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

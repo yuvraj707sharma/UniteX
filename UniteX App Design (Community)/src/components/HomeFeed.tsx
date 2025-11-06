@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { supabase } from "../lib/supabase";
+import CreatePost from "./CreatePost";
 
 const mockPosts = [
   {
@@ -94,9 +95,15 @@ export default function HomeFeed({
 }: HomeFeedProps) {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [showCreatePost, setShowCreatePost] = useState(false);
+  const [posts, setPosts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
 
   useEffect(() => {
     fetchCurrentUser();
+    fetchPosts();
   }, []);
 
   const fetchCurrentUser = async () => {
@@ -121,13 +128,77 @@ export default function HomeFeed({
     }
   };
 
-  const handleCreatePost = () => {
-    toast.success("Post created successfully!");
+  const fetchPosts = async (pageNum = 0, append = false) => {
+    try {
+      if (!append) setLoading(true);
+      else setLoadingMore(true);
+
+      const POSTS_PER_PAGE = 10;
+      const { data, error } = await supabase
+        .from('posts')
+        .select(`
+          *,
+          profiles(full_name, username, department, avatar_url)
+        `)
+        .eq('is_approved', true)
+        .order('created_at', { ascending: false })
+        .range(pageNum * POSTS_PER_PAGE, (pageNum + 1) * POSTS_PER_PAGE - 1);
+
+      if (error) throw error;
+
+      const formattedPosts = data?.map(post => ({
+        id: post.id,
+        author: post.profiles.full_name || 'Unknown User',
+        username: post.profiles.username || 'unknown',
+        department: post.profiles.department || 'Unknown',
+        content: post.content,
+        likes: post.likes_count || 0,
+        comments: post.comments_count || 0,
+        shares: post.shares_count || 0,
+        timeAgo: new Date(post.created_at).toLocaleDateString(),
+        avatar: post.profiles.avatar_url || '',
+        image: post.media_urls?.[0] || undefined
+      })) || [];
+
+      if (append) {
+        setPosts(prev => [...prev, ...formattedPosts]);
+      } else {
+        const allPosts = formattedPosts.length > 0 ? formattedPosts : mockPosts;
+        setPosts(allPosts);
+      }
+
+      setHasMore(formattedPosts.length === POSTS_PER_PAGE);
+    } catch (error) {
+      console.error('Error fetching posts:', error);
+      if (!append) setPosts(mockPosts);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  const loadMorePosts = () => {
+    if (!loadingMore && hasMore) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      fetchPosts(nextPage, true);
+    }
+  };
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    if (scrollHeight - scrollTop <= clientHeight * 1.5) {
+      loadMorePosts();
+    }
+  };
+
+  const handlePostCreated = () => {
+    fetchPosts(); // Refresh posts
     setShowCreatePost(false);
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20 max-w-md mx-auto">
+    <div className="min-h-screen bg-background pb-20 max-w-md mx-auto" onScroll={handleScroll}>
       {/* Header */}
       <div className="sticky top-0 z-10 dark:bg-black/80 light:bg-white/80 backdrop-blur-xl border-b dark:border-zinc-800 light:border-gray-200">
         <div className="flex items-center justify-between px-4 py-3">
@@ -163,22 +234,38 @@ export default function HomeFeed({
       </div>
 
       {/* Feed */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.3 }}
-      >
-        {mockPosts.map((post, index) => (
-          <motion.div
-            key={post.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-          >
-            <PostCard {...post} onNavigateToProfile={onNavigateToOtherProfile} />
-          </motion.div>
-        ))}
-      </motion.div>
+      {loading ? (
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full"></div>
+        </div>
+      ) : (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+        >
+          {posts.map((post, index) => (
+            <motion.div
+              key={post.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+            >
+              <PostCard {...post} onNavigateToProfile={onNavigateToOtherProfile} />
+            </motion.div>
+          ))}
+          {loadingMore && (
+            <div className="flex items-center justify-center py-4">
+              <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full"></div>
+            </div>
+          )}
+          {!hasMore && posts.length > 0 && (
+            <div className="text-center py-4 text-muted-foreground text-sm">
+              You've reached the end!
+            </div>
+          )}
+        </motion.div>
+      )}
 
       {/* Floating Compose Button */}
       <button
@@ -188,31 +275,13 @@ export default function HomeFeed({
         <Plus className="w-6 h-6" />
       </button>
 
-      {/* Simple Create Post Modal */}
+      {/* Create Post Modal */}
       {showCreatePost && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-2xl w-full max-w-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">Create Post</h2>
-            <textarea 
-              placeholder="What's on your mind?"
-              className="w-full h-32 p-3 border border-border rounded-lg bg-background resize-none"
-            />
-            <div className="flex gap-2 mt-4">
-              <button 
-                onClick={handleCreatePost}
-                className="flex-1 py-2 bg-primary text-primary-foreground rounded-lg"
-              >
-                Post
-              </button>
-              <button 
-                onClick={() => setShowCreatePost(false)}
-                className="px-4 py-2 border border-border rounded-lg"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
+        <CreatePost
+          onClose={() => setShowCreatePost(false)}
+          onPostCreated={handlePostCreated}
+          currentUser={currentUser}
+        />
       )}
     </div>
   );

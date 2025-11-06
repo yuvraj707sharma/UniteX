@@ -50,10 +50,23 @@ export default function ChatConversation({ onBack, user, onClearUnread }: ChatCo
       
       setCurrentUserId(currentUser.id);
 
+      // Get the receiver's profile to get their user ID
+      const { data: receiverProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', user.username)
+        .single();
+
+      if (!receiverProfile) {
+        console.log('Receiver profile not found');
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('messages')
         .select('*')
-        .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${user.id}),and(sender_id.eq.${user.id},receiver_id.eq.${currentUser.id})`)
+        .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${receiverProfile.id}),and(sender_id.eq.${receiverProfile.id},receiver_id.eq.${currentUser.id})`)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
@@ -113,11 +126,23 @@ export default function ChatConversation({ onBack, user, onClearUnread }: ChatCo
         ? `${selectedMedia.type === "image" ? "📷 Photo" : "🎥 Video"}${inputText ? `: ${inputText}` : ""}`
         : inputText;
 
+      // Get the receiver's profile to get their user ID
+      const { data: receiverProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', user.username)
+        .single();
+
+      if (!receiverProfile) {
+        toast.error('User not found');
+        return;
+      }
+
       const { error } = await supabase
         .from('messages')
         .insert({
           sender_id: currentUserId,
-          receiver_id: user.id,
+          receiver_id: receiverProfile.id,
           content: messageContent,
           message_type: selectedMedia ? selectedMedia.type : 'text',
           image_url: selectedMedia?.type === 'image' ? selectedMedia.url : null,

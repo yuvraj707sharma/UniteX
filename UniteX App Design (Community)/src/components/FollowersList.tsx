@@ -159,25 +159,72 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
     }
   };
 
-  const handleFollowToggle = (username: string, type: "followers" | "following") => {
-    if (type === "followers") {
-      setFollowers(
-        followers.map((user) =>
-          user.username === username
-            ? { ...user, isFollowing: !user.isFollowing }
-            : user
-        )
-      );
-    } else {
-      setFollowing(
-        following.map((user) =>
-          user.username === username
-            ? { ...user, isFollowing: !user.isFollowing }
-            : user
-        )
-      );
+  const handleFollowToggle = async (username: string, type: "followers" | "following") => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Get the target user's profile
+      const { data: targetProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', username)
+        .single();
+
+      if (!targetProfile) {
+        toast.error('User not found');
+        return;
+      }
+
+      // Check if already following
+      const { data: existingFollow } = await supabase
+        .from('follows')
+        .select('id')
+        .eq('follower_id', user.id)
+        .eq('followed_id', targetProfile.id)
+        .single();
+
+      if (existingFollow) {
+        // Unfollow
+        await supabase
+          .from('follows')
+          .delete()
+          .eq('follower_id', user.id)
+          .eq('followed_id', targetProfile.id);
+        toast.success('Unfollowed!');
+      } else {
+        // Follow
+        await supabase
+          .from('follows')
+          .insert({
+            follower_id: user.id,
+            followed_id: targetProfile.id
+          });
+        toast.success('Following!');
+      }
+
+      // Update local state
+      if (type === "followers") {
+        setFollowers(
+          followers.map((user) =>
+            user.username === username
+              ? { ...user, isFollowing: !user.isFollowing }
+              : user
+          )
+        );
+      } else {
+        setFollowing(
+          following.map((user) =>
+            user.username === username
+              ? { ...user, isFollowing: !user.isFollowing }
+              : user
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error toggling follow:', error);
+      toast.error('Failed to update follow status');
     }
-    toast.success("Updated!");
   };
 
   const renderUserList = (users: User[], type: "followers" | "following") => (

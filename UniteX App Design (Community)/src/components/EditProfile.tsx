@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { Badge } from './ui/badge'
 import { toast } from 'sonner'
 import { sanitizeHtml, sanitizeUsername, validateUrl } from '../utils/sanitize'
+import { supabase } from '../lib/supabase'
 
 interface EditProfileProps {
   onBack: () => void
@@ -104,7 +105,7 @@ export default function EditProfile({ onBack, profile, onSave }: EditProfileProp
     setSkills(skills.filter(skill => skill !== skillToRemove))
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     try {
       // Validate required fields
       if (!formData.name.trim()) {
@@ -123,20 +124,55 @@ export default function EditProfile({ onBack, profile, onSave }: EditProfileProp
         return;
       }
       
-      // Sanitize input data
-      const sanitizedData = {
-        name: sanitizeHtml(formData.name.trim()),
-        username: sanitizeUsername(formData.username.trim()),
-        bio: sanitizeHtml(formData.bio.trim()),
-        location: sanitizeHtml(formData.location.trim()),
-        website: formData.website.trim()
+      let avatarUrl = avatarPreview;
+      
+      // Upload avatar if a new file was selected
+      if (avatarFile) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Not authenticated');
+        
+        const fileExt = avatarFile.name.split('.').pop();
+        const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+        
+        const { data, error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(fileName, avatarFile);
+          
+        if (uploadError) throw uploadError;
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(fileName);
+          
+        avatarUrl = publicUrl;
       }
+      
+      // Update profile in database
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: sanitizeHtml(formData.name.trim()),
+          username: sanitizeUsername(formData.username.trim()),
+          bio: sanitizeHtml(formData.bio.trim()),
+          portfolio_url: formData.website.trim(),
+          avatar_url: avatarUrl,
+          skills: skills.map(skill => skill.trim())
+        })
+        .eq('id', user.id);
+        
+      if (error) throw error;
       
       const updatedProfile = {
         ...profile,
-        ...sanitizedData,
-        skills: skills.map(skill => skill.trim()),
-        avatar: avatarPreview
+        name: formData.name.trim(),
+        username: formData.username.trim(),
+        bio: formData.bio.trim(),
+        website: formData.website.trim(),
+        avatar: avatarUrl,
+        skills: skills.map(skill => skill.trim())
       }
       
       onSave(updatedProfile)

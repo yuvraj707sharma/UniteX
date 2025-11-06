@@ -100,9 +100,21 @@ export default function Lists({ onBack }: ListsProps) {
     }
   };
 
-  const handleDeleteList = (listId: number, listName: string) => {
-    setLists((prev) => prev.filter((list) => list.id !== listId));
-    toast.success(`Deleted ${listName}`);
+  const handleDeleteList = async (listId: string, listName: string) => {
+    try {
+      const { error } = await supabase
+        .from('lists')
+        .delete()
+        .eq('id', listId);
+
+      if (error) throw error;
+
+      setLists((prev) => prev.filter((list) => list.id !== listId));
+      toast.success(`Deleted ${listName}`);
+    } catch (error) {
+      console.error('Error deleting list:', error);
+      toast.error('Failed to delete list');
+    }
   };
 
   const handleExploreList = (list: any) => {

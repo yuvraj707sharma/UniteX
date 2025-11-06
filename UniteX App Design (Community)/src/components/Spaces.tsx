@@ -51,12 +51,23 @@ interface SpacesProps {
   onBack: () => void;
 }
 
-export default function Spaces({ onBack }: SpacesProps) {
+export default function Vartalaap({ onBack }: SpacesProps) {
   const [spaces, setSpaces] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    getCurrentUser();
+  }, []);
+
+  const getCurrentUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    setCurrentUser(user);
+  };
 
   useEffect(() => {
     fetchSpaces();
+    getCurrentUser();
   }, []);
 
   const fetchSpaces = async () => {
@@ -83,6 +94,23 @@ export default function Spaces({ onBack }: SpacesProps) {
     topic: "",
     scheduled_for: ""
   });
+
+  const handleDeleteSpace = async (spaceId: string, spaceName: string) => {
+    try {
+      const { error } = await supabase
+        .from('spaces')
+        .delete()
+        .eq('id', spaceId);
+
+      if (error) throw error;
+
+      setSpaces((prev) => prev.filter((space) => space.id !== spaceId));
+      toast.success(`Deleted ${spaceName}`);
+    } catch (error) {
+      console.error('Error deleting space:', error);
+      toast.error('Failed to delete space');
+    }
+  };
 
   const handleJoinSpace = async (space: any) => {
     try {
@@ -178,8 +206,8 @@ export default function Spaces({ onBack }: SpacesProps) {
             <ArrowLeft className="w-6 h-6 text-foreground" />
           </button>
           <div className="flex-1">
-            <h1 className="text-foreground text-xl">Spaces</h1>
-            <p className="text-muted-foreground text-sm">Audio conversations</p>
+            <h1 className="text-foreground text-xl">Vartalaap</h1>
+            <p className="text-muted-foreground text-sm">Live voice conversations</p>
           </div>
           <button onClick={() => setShowCreateSpace(true)}>
             <Plus className="w-6 h-6 dark:text-blue-500 light:text-red-600" />
@@ -202,7 +230,7 @@ export default function Spaces({ onBack }: SpacesProps) {
           <>
             {/* All Spaces */}
             <div>
-              <h2 className="text-foreground mb-3">Community Spaces</h2>
+              <h2 className="text-foreground mb-3">Live Vartalaap Rooms</h2>
               {spaces.length > 0 ? spaces.map((space, index) => (
               <motion.div
                 key={space.id}
@@ -240,20 +268,32 @@ export default function Spaces({ onBack }: SpacesProps) {
                     )}
                   </div>
 
-                  <Button
-                    onClick={() => handleJoinSpace(space)}
-                    className="w-full dark:bg-purple-500 dark:hover:bg-purple-600 light:bg-red-600 light:hover:bg-red-700 text-white rounded-full"
-                  >
-                    <Users className="w-4 h-4 mr-2" />
-                    Join Space
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => handleJoinSpace(space)}
+                      className="flex-1 dark:bg-purple-500 dark:hover:bg-purple-600 light:bg-red-600 light:hover:bg-red-700 text-white rounded-full"
+                    >
+                      <Users className="w-4 h-4 mr-2" />
+                      Join Vartalaap
+                    </Button>
+                    {/* Show delete button only for space creator */}
+                    {currentUser && space.created_by === currentUser.id && (
+                      <Button
+                        onClick={() => handleDeleteSpace(space.id, space.name)}
+                        variant="outline"
+                        className="px-3 border-red-500 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"
+                      >
+                        Delete
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </motion.div>
               )) : (
                 <div className="text-center py-8">
                   <div className="text-4xl mb-4">🎙️</div>
-                  <h3 className="text-foreground text-lg mb-2">No spaces yet</h3>
-                  <p className="text-muted-foreground">Be the first to create a space!</p>
+                  <h3 className="text-foreground text-lg mb-2">No Vartalaap rooms yet</h3>
+                  <p className="text-muted-foreground">Start the first voice conversation!</p>
                 </div>
               )}
             </div>
@@ -265,15 +305,15 @@ export default function Spaces({ onBack }: SpacesProps) {
       <Dialog open={showCreateSpace} onOpenChange={setShowCreateSpace}>
         <DialogContent className="dark:bg-zinc-900 dark:border-zinc-800 light:bg-white light:border-gray-200 max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-foreground">Create a Space</DialogTitle>
+            <DialogTitle className="text-foreground">Start Vartalaap</DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              Start an audio conversation
+              Begin a live voice conversation
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <Input
-              placeholder="Space Title"
+              placeholder="Vartalaap Title"
               value={spaceForm.title}
               onChange={(e) => setSpaceForm({...spaceForm, title: e.target.value})}
             />
@@ -308,7 +348,7 @@ export default function Spaces({ onBack }: SpacesProps) {
                 disabled={!spaceForm.title || !spaceForm.description}
                 className="flex-1 dark:bg-purple-500 dark:hover:bg-purple-600 light:bg-red-600 light:hover:bg-red-700 text-white"
               >
-                Create Space
+                Start Vartalaap
               </Button>
             </div>
           </div>

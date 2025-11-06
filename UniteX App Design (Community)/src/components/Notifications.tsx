@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Settings, Heart, MessageCircle, Users, AtSign } from "lucide-react";
+import { Heart, MessageCircle, Users, AtSign } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
@@ -257,7 +257,6 @@ export default function Notifications({ onNavigateToProfile }: NotificationsProp
       <div className="sticky top-0 z-10 dark:bg-black/80 light:bg-white/80 backdrop-blur-xl border-b dark:border-zinc-800 light:border-gray-200">
         <div className="flex items-center justify-between px-4 py-3">
           <h1 className="text-foreground text-xl">Notifications</h1>
-          <Settings className="w-6 h-6 text-muted-foreground" />
         </div>
 
         {/* Tabs */}

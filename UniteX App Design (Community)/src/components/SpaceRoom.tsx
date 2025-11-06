@@ -12,7 +12,7 @@ interface SpaceRoomProps {
   onLeave: () => void;
 }
 
-export default function SpaceRoom({ space, onLeave }: SpaceRoomProps) {
+export default function VartalaapRoom({ space, onLeave }: SpaceRoomProps) {
   const [members, setMembers] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isMuted, setIsMuted] = useState(true);
@@ -22,7 +22,24 @@ export default function SpaceRoom({ space, onLeave }: SpaceRoomProps) {
   useEffect(() => {
     fetchMembers();
     getCurrentUser();
-  }, []);
+    
+    // Subscribe to realtime updates
+    const channel = supabase
+      .channel('vartalaap-room')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'space_members', filter: `space_id=eq.${space.id}` },
+        () => fetchMembers()
+      )
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'spaces', filter: `id=eq.${space.id}` },
+        () => fetchMembers()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [space.id]);
 
   const getCurrentUser = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -54,18 +71,82 @@ export default function SpaceRoom({ space, onLeave }: SpaceRoomProps) {
     }
   };
 
-  const toggleMute = () => {
-    setIsMuted(!isMuted);
-    toast.success(isMuted ? 'Microphone on' : 'Microphone off');
+  const toggleMute = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase
+          .from('space_members')
+          .update({ is_muted: !isMuted })
+          .eq('space_id', space.id)
+          .eq('user_id', user.id);
+      }
+      setIsMuted(!isMuted);
+      toast.success(isMuted ? 'Microphone on' : 'Microphone off');
+    } catch (error) {
+      console.error('Error toggling mute:', error);
+    }
   };
 
-  const toggleHandRaise = () => {
-    setHandRaised(!handRaised);
-    toast.success(handRaised ? 'Hand lowered' : 'Hand raised');
+  const toggleHandRaise = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase
+          .from('space_members')
+          .update({ hand_raised: !handRaised })
+          .eq('space_id', space.id)
+          .eq('user_id', user.id);
+      }
+      setHandRaised(!handRaised);
+      toast.success(handRaised ? 'Hand lowered' : 'Hand raised');
+    } catch (error) {
+      console.error('Error toggling hand raise:', error);
+    }
   };
 
-  const handleLeave = () => {
-    toast.success('Left the space');
+  const allowToSpeak = async (memberId: string) => {
+    try {
+      const { error } = await supabase
+        .from('space_members')
+        .update({ 
+          voice_role: 'speaker',
+          can_speak: true, 
+          hand_raised: false 
+        })
+        .eq('id', memberId);
+
+      if (error) throw error;
+
+      toast.success('User can now speak in Vartalaap');
+    } catch (error) {
+      console.error('Error allowing user to speak:', error);
+      toast.error('Failed to allow user to speak');
+    }
+  };
+
+  const handleLeave = async () => {
+    try {
+      // Remove user from space_members
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase
+          .from('space_members')
+          .delete()
+          .eq('space_id', space.id)
+          .eq('user_id', user.id);
+        
+        // Update listener count
+        await supabase
+          .from('spaces')
+          .update({ listener_count: Math.max(0, (space.listener_count || 1) - 1) })
+          .eq('id', space.id);
+      }
+    } catch (error) {
+      console.error('Error leaving vartalaap:', error);
+    }
+    
+    toast.success('Left Vartalaap');
     onLeave();
   };
 
@@ -81,10 +162,10 @@ export default function SpaceRoom({ space, onLeave }: SpaceRoomProps) {
             <ArrowLeft className="w-6 h-6 text-foreground" />
           </button>
           <div className="flex-1">
-            <h1 className="text-foreground text-lg">{space.name}</h1>
+            <h1 className="text-foreground text-lg">🎙️ {space.name}</h1>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-              <span className="text-muted-foreground text-sm">{members.length} participants</span>
+              <span className="text-muted-foreground text-sm">{members.length} in Vartalaap</span>
             </div>
           </div>
           {isHost && (
@@ -99,12 +180,18 @@ export default function SpaceRoom({ space, onLeave }: SpaceRoomProps) {
       <div className="p-4 pb-32">
         {/* Space Info */}
         <div className="mb-6 text-center">
-          <div className="text-4xl mb-2">🎙️</div>
+          <div className="text-4xl mb-2">🗣️</div>
           <p className="text-muted-foreground text-sm">{space.description}</p>
           {space.topic && (
             <Badge className="mt-2 dark:bg-zinc-800 light:bg-gray-200 dark:text-zinc-300 light:text-gray-700">
               {space.topic}
             </Badge>
+          )}
+          {isHost && (
+            <div className="mt-3 flex items-center justify-center gap-2 px-3 py-1 bg-yellow-500/10 border border-yellow-500/20 rounded-full">
+              <Crown className="w-4 h-4 text-yellow-500" />
+              <span className="text-sm text-yellow-500 font-medium">You are the Host</span>
+            </div>
           )}
         </div>
 
@@ -113,7 +200,7 @@ export default function SpaceRoom({ space, onLeave }: SpaceRoomProps) {
           <div className="mb-6">
             <h3 className="text-foreground mb-3 flex items-center gap-2">
               <Mic className="w-4 h-4" />
-              Speaking ({speakingMembers.length})
+              🎤 Speaking ({speakingMembers.length})
             </h3>
             <div className="grid grid-cols-2 gap-3">
               {speakingMembers.map((member) => (
@@ -125,20 +212,31 @@ export default function SpaceRoom({ space, onLeave }: SpaceRoomProps) {
                 >
                   <div className="flex flex-col items-center text-center">
                     <div className="relative mb-2">
-                      <Avatar className="w-12 h-12">
+                      <Avatar className={`w-12 h-12 ${member.voice_role === 'host' ? 'ring-2 ring-yellow-500' : ''}`}>
                         <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black">
                           {member.profiles?.full_name?.charAt(0) || 'U'}
                         </AvatarFallback>
                       </Avatar>
-                      {member.role === 'admin' && (
-                        <Crown className="w-4 h-4 text-yellow-500 absolute -top-1 -right-1" />
+                      {member.voice_role === 'host' && (
+                        <div className="absolute -top-1 -right-1 bg-yellow-500 rounded-full p-1">
+                          <Crown className="w-3 h-3 text-white" />
+                        </div>
                       )}
-                      <div className="w-3 h-3 bg-green-500 rounded-full absolute -bottom-1 -right-1 border-2 dark:border-zinc-900 light:border-gray-50" />
+                      <div className={`w-3 h-3 rounded-full absolute -bottom-1 -right-1 border-2 dark:border-zinc-900 light:border-gray-50 ${
+                        member.is_muted ? 'bg-red-500' : 'bg-green-500 animate-pulse'
+                      }`} />
                     </div>
-                    <span className="text-foreground text-sm font-medium">
-                      {member.role === 'admin' && 'Host '}
-                      {member.profiles?.full_name || 'Unknown'}
-                    </span>
+                    <div className="text-center">
+                      <span className="text-foreground text-sm font-medium">
+                        {member.profiles?.full_name || 'Unknown'}
+                      </span>
+                      {member.voice_role === 'host' && (
+                        <div className="flex items-center justify-center gap-1 mt-1">
+                          <Crown className="w-3 h-3 text-yellow-500" />
+                          <span className="text-xs text-yellow-500 font-medium">HOST</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </motion.div>
               ))}
@@ -151,7 +249,7 @@ export default function SpaceRoom({ space, onLeave }: SpaceRoomProps) {
           <div>
             <h3 className="text-foreground mb-3 flex items-center gap-2">
               <Users className="w-4 h-4" />
-              Listening ({listeningMembers.length})
+              👂 Listening ({listeningMembers.length})
             </h3>
             <div className="space-y-2">
               {listeningMembers.map((member) => (
@@ -164,13 +262,34 @@ export default function SpaceRoom({ space, onLeave }: SpaceRoomProps) {
                       {member.profiles?.full_name?.charAt(0) || 'U'}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="text-foreground text-sm flex-1">
-                    {member.role === 'admin' && 'Host '}
-                    {member.profiles?.full_name || 'Unknown'}
-                  </span>
-                  {member.hand_raised && (
-                    <Hand className="w-4 h-4 text-yellow-500" />
-                  )}
+                  <div className="flex-1 flex items-center gap-2">
+                    <span className="text-foreground text-sm">
+                      {member.profiles?.full_name || 'Unknown'}
+                    </span>
+                    {member.voice_role === 'host' && (
+                      <div className="flex items-center gap-1">
+                        <Crown className="w-3 h-3 text-yellow-500" />
+                        <span className="text-xs text-yellow-500 font-medium">HOST</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {member.hand_raised && (
+                      <>
+                        <div className="animate-bounce">
+                          <Hand className="w-5 h-5 text-yellow-500" />
+                        </div>
+                        {isHost && (
+                          <button
+                            onClick={() => allowToSpeak(member.id)}
+                            className="text-xs px-3 py-1 bg-green-500 text-white rounded-full hover:bg-green-600 transition-colors"
+                          >
+                            ✓ Allow
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -192,13 +311,13 @@ export default function SpaceRoom({ space, onLeave }: SpaceRoomProps) {
           <div className="flex items-center gap-3">
             <button
               onClick={toggleHandRaise}
-              className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${
+              className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
                 handRaised
-                  ? 'bg-yellow-500 text-white'
-                  : 'dark:bg-zinc-800 light:bg-gray-200 dark:text-zinc-300 light:text-gray-700'
+                  ? 'bg-yellow-500 text-white animate-bounce shadow-lg'
+                  : 'dark:bg-zinc-800 light:bg-gray-200 dark:text-zinc-300 light:text-gray-700 hover:scale-105'
               }`}
             >
-              <Hand className="w-5 h-5" />
+              <Hand className={`w-5 h-5 ${handRaised ? 'animate-pulse' : ''}`} />
             </button>
 
             <button

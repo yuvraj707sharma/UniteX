@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Toaster } from "./components/ui/sonner";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import LoginScreen from "./components/LoginScreen";
-import AuthDebug from "./components/AuthDebug";
+
 import ProfileOnboarding from "./components/ProfileOnboarding";
 import HomeFeed from "./components/HomeFeed";
 import { supabase } from "./lib/supabase";
@@ -19,7 +19,7 @@ import Bookmarks from "./components/Bookmarks";
 import Search from "./components/Search";
 import Jobs from "./components/Jobs";
 import Lists from "./components/Lists";
-import Spaces from "./components/Spaces";
+import Vartalaap from "./components/Spaces";
 import BottomNav from "./components/BottomNav";
 
 type Screen =
@@ -259,7 +259,10 @@ export default function App() {
         }
         return <Notifications onNavigateToProfile={handleNavigateToOtherProfile} />;
       case "profile":
-        return <Profile onNavigateToFollowers={(tab) => handleNavigateToFollowers(tab, currentUser?.username, currentUser?.full_name)} />;
+        return <Profile 
+          onNavigateToFollowers={(tab) => handleNavigateToFollowers(tab, currentUser?.username, currentUser?.full_name)}
+          onNavigateToSettings={() => setCurrentScreen("settings")}
+        />;
       case "otherProfile":
         return (
           <OtherProfile
@@ -300,7 +303,7 @@ export default function App() {
       case "lists":
         return <Lists onBack={() => setCurrentScreen("home")} />;
       case "spaces":
-        return <Spaces onBack={() => setCurrentScreen("home")} />;
+        return <Vartalaap onBack={() => setCurrentScreen("home")} />;
       default:
         console.error('Unknown screen:', currentScreen);
         return (
@@ -338,7 +341,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <div className="relative min-h-screen bg-background">
-        <AuthDebug />
+
         <Toaster position="top-center" />
         <AnimatePresence mode="wait">
           <motion.div

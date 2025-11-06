@@ -11,6 +11,7 @@ import { supabase } from "../lib/supabase";
 
 interface ProfileProps {
   onNavigateToFollowers?: (tab: "followers" | "following", username: string, profileName: string) => void;
+  onNavigateToSettings?: () => void;
 }
 
 const mockProfile = {
@@ -93,7 +94,7 @@ const mockProfile = {
   ],
 };
 
-export default function Profile({ onNavigateToFollowers }: ProfileProps = {}) {
+export default function Profile({ onNavigateToFollowers, onNavigateToSettings }: ProfileProps = {}) {
   const [showEditProfile, setShowEditProfile] = useState(false)
   const [profileData, setProfileData] = useState<any>(null)
   const [userPosts, setUserPosts] = useState<any[]>([])
@@ -227,7 +228,9 @@ export default function Profile({ onNavigateToFollowers }: ProfileProps = {}) {
             <h1 className="dark:text-white light:text-black text-xl">{profileData.name}</h1>
             <p className="dark:text-zinc-500 light:text-gray-500 text-sm">{userPosts.length} posts</p>
           </div>
-          <Settings className="w-6 h-6 dark:text-zinc-400 light:text-gray-600" />
+          <button onClick={onNavigateToSettings}>
+            <Settings className="w-6 h-6 dark:text-zinc-400 light:text-gray-600" />
+          </button>
         </div>
       </div>
 

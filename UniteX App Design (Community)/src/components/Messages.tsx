@@ -147,7 +147,7 @@ export default function Messages({ initialChat, onClearUnread, onChatStateChange
         <div className="flex items-center justify-between px-4 py-3">
           <h1 className="text-foreground text-xl">Messages</h1>
           <div className="flex items-center gap-3">
-            <button onClick={() => toast.info("Message settings updated!")}>
+            <button onClick={() => toast.info("Message settings coming soon!")}>
               <Settings className="w-6 h-6 text-muted-foreground" />
             </button>
             <button onClick={() => setShowNewMessageDialog(true)}>

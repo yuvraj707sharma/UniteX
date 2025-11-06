@@ -193,11 +193,11 @@ export default function ProfileMenu({
             </button>
 
             <button
-              onClick={() => onNavigateToSpaces ? handleNavigation(onNavigateToSpaces) : handleFeatureClick("Spaces")}
+              onClick={() => onNavigateToSpaces ? handleNavigation(onNavigateToSpaces) : handleFeatureClick("Vartalaap")}
               className="w-full px-4 py-3 flex items-center gap-3 text-foreground dark:hover:bg-zinc-900 light:hover:bg-gray-100 transition-colors"
             >
               <Radio className="w-5 h-5" />
-              <span>Spaces</span>
+              <span>Vartalaap</span>
             </button>
 
             <Separator className="dark:bg-zinc-800 light:bg-gray-200 my-2" />

@@ -1,40 +1,41 @@
+import { useState, useEffect } from "react";
 import { ArrowLeft, MoreVertical } from "lucide-react";
 import PostCard from "./PostCard";
 import { motion } from "framer-motion";
+import { supabase } from "../lib/supabase";
 
 interface BookmarksProps {
   onBack: () => void;
 }
 
-const bookmarkedPosts = [
-  {
-    id: 1,
-    author: "Sydney Sweeny",
-    username: "sydneysweeny",
-    department: "CS",
-    content: "Looking for a business student to help validate my AI-powered study assistant app! Need help with market research and business model. 🚀",
-    likes: 45,
-    comments: 12,
-    shares: 8,
-    timeAgo: "2h",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sydney",
-  },
-  {
-    id: 4,
-    author: "Deepak",
-    username: "deepak",
-    department: "Design",
-    content: "Just finished the UI mockups for a mental health awareness app. Need developers and psychology students to bring this to life. Check out my portfolio!",
-    image: "https://images.unsplash.com/photo-1586717791821-3f44a563fa4c?w=800&q=80",
-    likes: 134,
-    comments: 31,
-    shares: 24,
-    timeAgo: "8h",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Deepak",
-  },
-];
+
 
 export default function Bookmarks({ onBack }: BookmarksProps) {
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    fetchCurrentUser();
+  }, []);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (profile) {
+        setCurrentUser(profile);
+      }
+    } catch (error) {
+      console.error('Error fetching current user:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-20 max-w-md mx-auto">
       {/* Header */}
@@ -45,7 +46,7 @@ export default function Bookmarks({ onBack }: BookmarksProps) {
           </button>
           <div className="flex-1">
             <h1 className="text-foreground text-xl">Bookmarks</h1>
-            <p className="text-muted-foreground text-sm">@alexjohnson</p>
+            <p className="text-muted-foreground text-sm">@{currentUser?.username || 'user'}</p>
           </div>
           <button>
             <MoreVertical className="w-6 h-6 text-muted-foreground" />
@@ -59,17 +60,8 @@ export default function Bookmarks({ onBack }: BookmarksProps) {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.3 }}
       >
-        {bookmarkedPosts.length > 0 ? (
-          bookmarkedPosts.map((post, index) => (
-            <motion.div
-              key={post.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <PostCard {...post} />
-            </motion.div>
-          ))
+        {false ? (
+          []
         ) : (
           <div className="flex items-center justify-center h-96">
             <div className="text-center space-y-4">

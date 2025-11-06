@@ -17,67 +17,7 @@ interface User {
   isFollowing: boolean;
 }
 
-const mockFollowers: User[] = [
-  {
-    name: "Sydney Sweeny",
-    username: "sydneysweeny",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sydney",
-    department: "CS",
-    bio: "AI enthusiast | Building cool stuff",
-    isFollowing: true,
-  },
-  {
-    name: "Simran",
-    username: "simran",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Simran",
-    department: "Business",
-    bio: "Entrepreneur | Sustainability advocate",
-    isFollowing: true,
-  },
-  {
-    name: "Dheemant Agarwal",
-    username: "dheemant",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Dheemant",
-    department: "Law",
-    bio: "IP Law | Startup Legal Advisor",
-    isFollowing: false,
-  },
-  {
-    name: "Deepak",
-    username: "deepak",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Deepak",
-    department: "Design",
-    bio: "UI/UX Designer | Creative thinker",
-    isFollowing: true,
-  },
-];
 
-const mockFollowing: User[] = [
-  {
-    name: "James Wilson",
-    username: "jameswilson",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=James",
-    department: "Engineering",
-    bio: "IoT Developer | Hardware enthusiast",
-    isFollowing: true,
-  },
-  {
-    name: "Sarah Chen",
-    username: "sarahchen",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah",
-    department: "CS",
-    bio: "Full-stack developer | Open source contributor",
-    isFollowing: true,
-  },
-  {
-    name: "Michael Brown",
-    username: "michaelbrown",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Michael",
-    department: "Business",
-    bio: "Marketing strategist | Growth hacker",
-    isFollowing: true,
-  },
-];
 
 interface FollowersListProps {
   onBack: () => void;
@@ -151,9 +91,8 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
       setFollowing(formattedFollowing);
     } catch (error) {
       console.error('Error fetching follow data:', error);
-      // Fallback to mock data
-      setFollowers(mockFollowers.slice(0, 2));
-      setFollowing(mockFollowing.slice(0, 1));
+      setFollowers([]);
+      setFollowing([]);
     } finally {
       setLoading(false);
     }

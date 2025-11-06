@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "android": "cap run android",
+    "ios": "cap run ios",
+    "build:mobile": "npm run build && cap copy && cap sync"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",
@@ -53,7 +56,10 @@
     "recharts": "^2.15.2",
     "sonner": "^2.0.3",
     "tailwind-merge": "^2.2.0",
-    "vaul": "^1.1.2"
+    "vaul": "^1.1.2",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/ios": "^6.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
@@ -61,6 +67,12 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react-swc": "^3.10.2",
     "typescript": "^5.3.0",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "@capacitor/cli": "^6.0.0"
+  },
+  "capacitor": {
+    "appId": "com.jecrc.unitex",
+    "appName": "UniteX",
+    "webDir": "dist"
   }
 }

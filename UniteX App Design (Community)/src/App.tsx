@@ -41,7 +41,11 @@ type Screen =
   | "spaces";
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>("login");
+  const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
+    // Persist current screen in development
+    const saved = localStorage.getItem('currentScreen');
+    return (saved as Screen) || "login";
+  });
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userEmail, setUserEmail] = useState("");
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -159,6 +163,7 @@ export default function App() {
         setPreselectedChat(null);
       }
       setCurrentScreen(screen as Screen);
+      localStorage.setItem('currentScreen', screen);
     } catch (error) {
       console.error('Navigation error:', error);
     }

@@ -8,69 +8,7 @@ import { toast } from "sonner";
 import { supabase } from "../lib/supabase";
 import CreatePost from "./CreatePost";
 
-const mockPosts = [
-  {
-    id: 1,
-    author: "Sydney Sweeny",
-    username: "sydneysweeny",
-    department: "CS",
-    content: "Looking for a business student to help validate my AI-powered study assistant app! Need help with market research and business model. 🚀",
-    likes: 45,
-    comments: 12,
-    shares: 8,
-    timeAgo: "2h",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sydney",
-  },
-  {
-    id: 2,
-    author: "Simran",
-    username: "simran",
-    department: "Business",
-    content: "Excited to announce our campus sustainability project just got approved! Looking for engineering students to help design eco-friendly solutions. DM me!",
-    likes: 89,
-    comments: 23,
-    shares: 15,
-    timeAgo: "4h",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Simran",
-  },
-  {
-    id: 3,
-    author: "Dheemant Agarwal",
-    username: "dheemant",
-    department: "Law",
-    content: "Working on IP protection strategies for student startups. Any CS students with patentable ideas? Let's collaborate!",
-    likes: 67,
-    comments: 18,
-    shares: 11,
-    timeAgo: "6h",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Dheemant",
-  },
-  {
-    id: 4,
-    author: "Deepak",
-    username: "deepak",
-    department: "Design",
-    content: "Just finished the UI mockups for a mental health awareness app. Need developers and psychology students to bring this to life. Check out my portfolio!",
-    image: "https://images.unsplash.com/photo-1586717791821-3f44a563fa4c?w=800&q=80",
-    likes: 134,
-    comments: 31,
-    shares: 24,
-    timeAgo: "8h",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Deepak",
-  },
-  {
-    id: 5,
-    author: "James Wilson",
-    username: "jameswilson",
-    department: "Engineering",
-    content: "Built a prototype for an automated campus parking system. Looking for feedback and potential collaborators from IoT and software backgrounds.",
-    likes: 92,
-    comments: 27,
-    shares: 19,
-    timeAgo: "12h",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=James",
-  },
-];
+
 
 interface HomeFeedProps {
   onNavigateToProfile: () => void;
@@ -163,14 +101,13 @@ export default function HomeFeed({
       if (append) {
         setPosts(prev => [...prev, ...formattedPosts]);
       } else {
-        const allPosts = formattedPosts.length > 0 ? formattedPosts : mockPosts;
-        setPosts(allPosts);
+        setPosts(formattedPosts);
       }
 
       setHasMore(formattedPosts.length === POSTS_PER_PAGE);
     } catch (error) {
       console.error('Error fetching posts:', error);
-      if (!append) setPosts(mockPosts);
+      if (!append) setPosts([]);
     } finally {
       setLoading(false);
       setLoadingMore(false);

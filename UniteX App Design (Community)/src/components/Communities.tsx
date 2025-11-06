@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { Search, Settings } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Search, Settings, Plus } from "lucide-react";
+import { supabase } from "../lib/supabase";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
@@ -7,61 +8,37 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import CommunityDetail from "./CommunityDetail";
 
-const initialCommunities = [
-  {
-    id: 1,
-    name: "Computer Science",
-    members: 1234,
-    description: "AI, Web Dev, Mobile Apps, and more",
-    joined: true,
-    color: "from-blue-500 to-cyan-500",
-  },
-  {
-    id: 2,
-    name: "Business & Entrepreneurship",
-    members: 892,
-    description: "Startups, Marketing, Finance",
-    joined: false,
-    color: "from-green-500 to-emerald-500",
-  },
-  {
-    id: 3,
-    name: "Design & Creative",
-    members: 756,
-    description: "UI/UX, Graphic Design, Animation",
-    joined: true,
-    color: "from-purple-500 to-pink-500",
-  },
-  {
-    id: 4,
-    name: "Engineering",
-    members: 1089,
-    description: "Mechanical, Electrical, Civil projects",
-    joined: false,
-    color: "from-orange-500 to-red-500",
-  },
-  {
-    id: 5,
-    name: "Law & Legal Studies",
-    members: 423,
-    description: "IP, Contracts, Student Rights",
-    joined: false,
-    color: "from-indigo-500 to-blue-500",
-  },
-  {
-    id: 6,
-    name: "Data Science & Analytics",
-    members: 678,
-    description: "ML, Statistics, Data Visualization",
-    joined: true,
-    color: "from-teal-500 to-cyan-500",
-  },
-];
+const initialCommunities: any[] = [];
 
 export default function Communities() {
   const [communities, setCommunities] = useState(initialCommunities);
   const [activeTab, setActiveTab] = useState("explore");
-  const [selectedCommunity, setSelectedCommunity] = useState<typeof initialCommunities[0] | null>(null);
+  const [selectedCommunity, setSelectedCommunity] = useState<any | null>(null);
+  const [showCreateCommunity, setShowCreateCommunity] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    fetchCurrentUser();
+  }, []);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (profile) {
+        setCurrentUser(profile);
+      }
+    } catch (error) {
+      console.error('Error fetching current user:', error);
+    }
+  };
 
   const handleJoinToggle = (communityId: number) => {
     setCommunities((prev) =>
@@ -126,11 +103,11 @@ export default function Communities() {
         <div className="flex items-center justify-between px-4 py-3">
           <h1 className="dark:text-white light:text-black text-xl">Communities</h1>
           <div className="flex items-center gap-3">
+            <button onClick={() => setShowCreateCommunity(true)}>
+              <Plus className="w-6 h-6 dark:text-zinc-400 light:text-gray-600" />
+            </button>
             <button onClick={() => toast.info("Search communities coming soon!")}>
               <Search className="w-6 h-6 dark:text-zinc-400 light:text-gray-600" />
-            </button>
-            <button onClick={() => toast.info("Settings coming soon!")}>
-              <Settings className="w-6 h-6 dark:text-zinc-400 light:text-gray-600" />
             </button>
           </div>
         </div>
@@ -212,7 +189,23 @@ export default function Communities() {
         </TabsContent>
 
         <TabsContent value="explore" className="m-0 p-4 space-y-3">
-          {exploreCommunities.map((community, index) => (
+          {exploreCommunities.length === 0 ? (
+            <div className="flex items-center justify-center h-96">
+              <div className="text-center space-y-4">
+                <div className="text-6xl mb-4">🏘️</div>
+                <h2 className="text-foreground text-xl">No communities yet</h2>
+                <p className="text-muted-foreground max-w-sm">
+                  Be the first to create a community for your interests
+                </p>
+                <button 
+                  onClick={() => setShowCreateCommunity(true)}
+                  className="mt-4 px-6 py-2 bg-primary text-primary-foreground rounded-lg"
+                >
+                  Create Community
+                </button>
+              </div>
+            </div>
+          ) : exploreCommunities.map((community, index) => (
             <motion.div
               key={community.id}
               initial={{ opacity: 0, y: 20 }}
@@ -260,18 +253,45 @@ export default function Communities() {
               </div>
             </motion.div>
           ))}
-          {loadingMore && (
-            <div className="flex items-center justify-center py-4">
-              <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full"></div>
-            </div>
-          )}
-          {!hasMore && communities.length > 6 && (
-            <div className="text-center py-4 text-muted-foreground text-sm">
-              All communities loaded!
-            </div>
-          )}
+
         </TabsContent>
       </Tabs>
+
+      {/* Create Community Modal */}
+      {showCreateCommunity && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-2xl w-full max-w-lg p-6">
+            <h2 className="text-xl font-semibold mb-4">Create Community</h2>
+            <div className="space-y-4">
+              <input 
+                placeholder="Community name"
+                className="w-full p-3 border border-border rounded-lg bg-background"
+              />
+              <textarea 
+                placeholder="Description"
+                className="w-full h-24 p-3 border border-border rounded-lg bg-background resize-none"
+              />
+            </div>
+            <div className="flex gap-2 mt-6">
+              <button 
+                onClick={() => {
+                  toast.success('Community created!');
+                  setShowCreateCommunity(false);
+                }}
+                className="flex-1 py-2 bg-primary text-primary-foreground rounded-lg"
+              >
+                Create
+              </button>
+              <button 
+                onClick={() => setShowCreateCommunity(false)}
+                className="px-4 py-2 border border-border rounded-lg"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -7,85 +7,9 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 
 const initialNotifications = {
-  all: [
-    {
-      id: 1,
-      type: "like",
-      user: "Sydney Sweeny",
-      username: "sydneysweeny",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sydney",
-      content: "liked your project idea",
-      time: "2h ago",
-      read: false,
-    },
-    {
-      id: 2,
-      type: "collaboration",
-      user: "Simran",
-      username: "simran",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Simran",
-      content: "applied to join your AI Navigation project",
-      time: "4h ago",
-      read: false,
-      actionable: true,
-    },
-    {
-      id: 3,
-      type: "mention",
-      user: "Dheemant Agarwal",
-      username: "dheemant",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Dheemant",
-      content: "mentioned you in a comment",
-      time: "6h ago",
-      read: true,
-    },
-    {
-      id: 4,
-      type: "comment",
-      user: "Deepak",
-      username: "deepak",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Deepak",
-      content: "commented on your post",
-      time: "8h ago",
-      read: true,
-    },
-  ],
-  collaborations: [
-    {
-      id: 2,
-      type: "collaboration",
-      user: "Simran",
-      username: "simran",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Simran",
-      content: "applied to join your AI Navigation project",
-      time: "4h ago",
-      read: false,
-      actionable: true,
-    },
-    {
-      id: 5,
-      type: "collaboration",
-      user: "Yuvraj",
-      username: "yuvraj",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Yuvraj",
-      content: "invited you to join IoT Parking System",
-      time: "1d ago",
-      read: true,
-      actionable: true,
-    },
-  ],
-  mentions: [
-    {
-      id: 3,
-      type: "mention",
-      user: "Dheemant Agarwal",
-      username: "dheemant",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Dheemant",
-      content: "mentioned you in a comment",
-      time: "6h ago",
-      read: true,
-    },
-  ],
+  all: [],
+  collaborations: [],
+  mentions: [],
 };
 
 const getNotificationIcon = (type: string) => {
@@ -288,7 +212,7 @@ export default function Notifications({ onNavigateToProfile }: NotificationsProp
               animate={{ opacity: 1 }}
               transition={{ duration: 0.3 }}
             >
-              {notifications.all.map((notification, index) => (
+              {notifications.all.length > 0 ? notifications.all.map((notification, index) => (
                 <motion.div
                   key={notification.id}
                   initial={{ opacity: 0, x: -20 }}
@@ -303,7 +227,15 @@ export default function Notifications({ onNavigateToProfile }: NotificationsProp
                     onNavigateToPost={onNavigateToProfile}
                   />
                 </motion.div>
-              ))}
+              )) : (
+                <div className="flex items-center justify-center h-96">
+                  <div className="text-center space-y-4">
+                    <div className="text-4xl mb-4">🔔</div>
+                    <p className="text-muted-foreground">No notifications yet</p>
+                    <p className="text-sm text-muted-foreground">You'll see notifications here when people interact with your posts</p>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </TabsContent>
 
@@ -313,7 +245,7 @@ export default function Notifications({ onNavigateToProfile }: NotificationsProp
               animate={{ opacity: 1 }}
               transition={{ duration: 0.3 }}
             >
-              {notifications.collaborations.map((notification, index) => (
+              {notifications.collaborations.length > 0 ? notifications.collaborations.map((notification, index) => (
                 <motion.div
                   key={notification.id}
                   initial={{ opacity: 0, x: -20 }}
@@ -328,7 +260,15 @@ export default function Notifications({ onNavigateToProfile }: NotificationsProp
                     onNavigateToPost={onNavigateToProfile}
                   />
                 </motion.div>
-              ))}
+              )) : (
+                <div className="flex items-center justify-center h-96">
+                  <div className="text-center space-y-4">
+                    <div className="text-4xl mb-4">🤝</div>
+                    <p className="text-muted-foreground">No collaboration requests</p>
+                    <p className="text-sm text-muted-foreground">Collaboration requests will appear here</p>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </TabsContent>
 
@@ -338,7 +278,7 @@ export default function Notifications({ onNavigateToProfile }: NotificationsProp
               animate={{ opacity: 1 }}
               transition={{ duration: 0.3 }}
             >
-              {notifications.mentions.map((notification, index) => (
+              {notifications.mentions.length > 0 ? notifications.mentions.map((notification, index) => (
                 <motion.div
                   key={notification.id}
                   initial={{ opacity: 0, x: -20 }}
@@ -351,7 +291,15 @@ export default function Notifications({ onNavigateToProfile }: NotificationsProp
                     onNavigateToPost={onNavigateToProfile}
                   />
                 </motion.div>
-              ))}
+              )) : (
+                <div className="flex items-center justify-center h-96">
+                  <div className="text-center space-y-4">
+                    <div className="text-4xl mb-4">@</div>
+                    <p className="text-muted-foreground">No mentions yet</p>
+                    <p className="text-sm text-muted-foreground">When someone mentions you, it'll show up here</p>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </TabsContent>
         </Tabs>

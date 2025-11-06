@@ -114,8 +114,8 @@ export default function LoginScreen({ onLogin, onNeedsOnboarding }: LoginScreenP
             transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
             className="inline-block"
           >
-            <div className="w-20 h-20 bg-gradient-to-br dark:from-blue-500 dark:to-blue-600 light:from-red-500 light:to-red-600 rounded-3xl flex items-center justify-center mx-auto mb-4">
-              <span className="text-3xl">🚀</span>
+            <div className="w-20 h-20 flex items-center justify-center mx-auto mb-4">
+              <img src="/unitex-logo.png" alt="UniteX" className="w-20 h-20" />
             </div>
           </motion.div>
           <h1 className="text-foreground text-4xl">UniteX</h1>

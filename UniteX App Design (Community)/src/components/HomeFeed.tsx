@@ -160,7 +160,7 @@ export default function HomeFeed({
 
           <div className="flex-1 flex justify-center">
             <div className="w-8 h-8 flex items-center justify-center">
-              <span className="text-2xl">🚀</span>
+              <img src="/unitex-logo.png" alt="UniteX" className="w-8 h-8" />
             </div>
           </div>
 

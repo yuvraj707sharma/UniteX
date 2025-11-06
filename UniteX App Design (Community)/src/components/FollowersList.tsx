@@ -4,8 +4,9 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { supabase } from "../lib/supabase";
 
 interface User {
   name: string;
@@ -86,51 +87,77 @@ interface FollowersListProps {
   profileName?: string;
 }
 
-export default function FollowersList({ onBack, onNavigateToProfile, initialTab = "followers", username = "alexjohnson", profileName }: FollowersListProps) {
-  // Generate different follower lists based on username
-  const getFollowersData = (user: string) => {
-    if (user === "sydneysweeny") {
-      return {
-        followers: [
-          ...mockFollowers,
-          ...Array.from({ length: 253 }, (_, i) => ({
-            name: `Student ${i + 5}`,
-            username: `student${i + 5}`,
-            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=Student${i + 5}`,
-            department: ["CS", "Business", "Design", "Law", "Engineering"][i % 5],
-            bio: `${["CS", "Business", "Design", "Law", "Engineering"][i % 5]} student | Learning and growing`,
-            isFollowing: Math.random() > 0.5,
-          }))
-        ],
-        following: mockFollowing,
-        name: "Sydney Sweeny",
-        username: "sydneysweeny"
-      };
-    } else if (user === "simran") {
-      return {
-        followers: [
-          { name: "Business Student 1", username: "bizstudent1", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=BizStudent1", department: "Business", bio: "Marketing enthusiast", isFollowing: true },
-          { name: "Eco Warrior", username: "ecowarrior", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=EcoWarrior", department: "Environmental", bio: "Sustainability advocate", isFollowing: false },
-        ],
-        following: [
-          { name: "Green Initiative", username: "greeninit", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=GreenInit", department: "Environmental", bio: "Campus sustainability", isFollowing: true },
-        ],
-        name: "Simran",
-        username: "simran"
-      };
-    } else {
-      return {
-        followers: mockFollowers.slice(0, 2),
-        following: mockFollowing.slice(0, 1),
-        name: "Alex Johnson",
-        username: "alexjohnson"
-      };
+export default function FollowersList({ onBack, onNavigateToProfile, initialTab = "followers", username, profileName }: FollowersListProps) {
+  const [followers, setFollowers] = useState<User[]>([]);
+  const [following, setFollowing] = useState<User[]>([]);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchFollowData();
+  }, [username]);
+
+  const fetchFollowData = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Get current user profile
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      setCurrentUser(profile);
+
+      // Fetch followers
+      const { data: followersData } = await supabase
+        .from('follows')
+        .select(`
+          follower_id,
+          profiles!follows_follower_id_fkey(id, full_name, username, department, bio, avatar_url)
+        `)
+        .eq('followed_id', user.id);
+
+      // Fetch following
+      const { data: followingData } = await supabase
+        .from('follows')
+        .select(`
+          followed_id,
+          profiles!follows_followed_id_fkey(id, full_name, username, department, bio, avatar_url)
+        `)
+        .eq('follower_id', user.id);
+
+      const formattedFollowers = followersData?.map(f => ({
+        name: f.profiles.full_name || 'Unknown',
+        username: f.profiles.username || 'unknown',
+        avatar: f.profiles.avatar_url || '',
+        department: f.profiles.department || 'Unknown',
+        bio: f.profiles.bio || 'No bio available',
+        isFollowing: followingData?.some(fw => fw.followed_id === f.profiles.id) || false
+      })) || [];
+
+      const formattedFollowing = followingData?.map(f => ({
+        name: f.profiles.full_name || 'Unknown',
+        username: f.profiles.username || 'unknown',
+        avatar: f.profiles.avatar_url || '',
+        department: f.profiles.department || 'Unknown',
+        bio: f.profiles.bio || 'No bio available',
+        isFollowing: true
+      })) || [];
+
+      setFollowers(formattedFollowers);
+      setFollowing(formattedFollowing);
+    } catch (error) {
+      console.error('Error fetching follow data:', error);
+      // Fallback to mock data
+      setFollowers(mockFollowers.slice(0, 2));
+      setFollowing(mockFollowing.slice(0, 1));
+    } finally {
+      setLoading(false);
     }
   };
-
-  const userData = getFollowersData(username);
-  const [followers, setFollowers] = useState(userData.followers);
-  const [following, setFollowing] = useState(userData.following);
 
   const handleFollowToggle = (username: string, type: "followers" | "following") => {
     if (type === "followers") {
@@ -226,8 +253,8 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
             <ArrowLeft className="w-6 h-6 text-foreground" />
           </button>
           <div>
-            <h1 className="dark:text-white light:text-black text-xl">{profileName || userData.name}</h1>
-            <p className="dark:text-zinc-500 light:text-gray-500 text-sm">@{username}</p>
+            <h1 className="dark:text-white light:text-black text-xl">{profileName || currentUser?.full_name || 'Loading...'}</h1>
+            <p className="dark:text-zinc-500 light:text-gray-500 text-sm">@{username || currentUser?.username || 'user'}</p>
           </div>
         </div>
       </div>

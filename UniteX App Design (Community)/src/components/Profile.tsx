@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Settings, MapPin, Calendar, Link as LinkIcon, Award, Briefcase } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Badge } from "./ui/badge";
@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { motion } from "framer-motion";
 import PostCard from "./PostCard";
 import EditProfile from "./EditProfile";
+import { supabase } from "../lib/supabase";
 
 interface ProfileProps {
   onNavigateToFollowers?: (tab: "followers" | "following", username: string, profileName: string) => void;
@@ -94,20 +95,128 @@ const mockProfile = {
 
 export default function Profile({ onNavigateToFollowers }: ProfileProps = {}) {
   const [showEditProfile, setShowEditProfile] = useState(false)
-  const [profileData, setProfileData] = useState(mockProfile)
+  const [profileData, setProfileData] = useState<any>(null)
+  const [userPosts, setUserPosts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, []);
+
+  const fetchUserProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Fetch user profile
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError) throw profileError;
+
+      // Fetch user posts
+      const { data: posts, error: postsError } = await supabase
+        .from('posts')
+        .select('*')
+        .eq('author_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (postsError) throw postsError;
+
+      // Fetch follower counts
+      const { data: followers } = await supabase
+        .from('follows')
+        .select('id')
+        .eq('followed_id', user.id);
+
+      const { data: following } = await supabase
+        .from('follows')
+        .select('id')
+        .eq('follower_id', user.id);
+
+      // Format profile data
+      const formattedProfile = {
+        name: profile.full_name || 'Unknown User',
+        username: profile.username || 'unknown',
+        email: profile.email || '',
+        avatar: profile.avatar_url || '',
+        department: profile.department || 'Unknown Department',
+        year: profile.year_of_study ? `${profile.year_of_study}${getOrdinalSuffix(profile.year_of_study)} Year` : 'Unknown Year',
+        bio: profile.bio || 'No bio available',
+        location: 'JECRC University',
+        joined: `Joined ${new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
+        website: profile.portfolio_url || '',
+        followers: followers?.length || 0,
+        following: following?.length || 0,
+        skills: profile.skills || [],
+        achievements: [
+          { icon: "🏆", title: "Active Member", description: "Joined the UniteX community" },
+          { icon: "📝", title: "Content Creator", description: `Posted ${posts?.length || 0} times` },
+          { icon: "🎯", title: "Collaborator", description: "Ready to work with others" },
+        ],
+        projects: [], // Will be populated from posts with project type
+        posts: posts || []
+      };
+
+      setProfileData(formattedProfile);
+      setUserPosts(posts || []);
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      // Don't fallback to mock data, show the actual error
+      setProfileData(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getOrdinalSuffix = (num: number) => {
+    const suffixes = ['th', 'st', 'nd', 'rd'];
+    const v = num % 100;
+    return suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0];
+  };
 
   const handleSaveProfile = (updatedProfile: any) => {
     setProfileData(updatedProfile)
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
+
   if (showEditProfile) {
     return (
       <EditProfile
-        onBack={() => setShowEditProfile(false)}
+        onBack={() => {
+          setShowEditProfile(false);
+          fetchUserProfile(); // Refresh profile after edit
+        }}
         profile={profileData}
         onSave={handleSaveProfile}
       />
     )
+  }
+
+  if (!profileData) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <p className="text-muted-foreground">Failed to load profile</p>
+          <button 
+            onClick={fetchUserProfile}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
   }
   return (
     <div className="min-h-screen bg-background pb-20 max-w-md mx-auto">
@@ -115,8 +224,8 @@ export default function Profile({ onNavigateToFollowers }: ProfileProps = {}) {
       <div className="sticky top-0 z-10 dark:bg-black/80 light:bg-white/80 backdrop-blur-xl border-b dark:border-zinc-800 light:border-gray-200">
         <div className="flex items-center justify-between px-4 py-3">
           <div>
-            <h1 className="dark:text-white light:text-black text-xl">{mockProfile.name}</h1>
-            <p className="dark:text-zinc-500 light:text-gray-500 text-sm">{mockProfile.projects.length} projects</p>
+            <h1 className="dark:text-white light:text-black text-xl">{profileData.name}</h1>
+            <p className="dark:text-zinc-500 light:text-gray-500 text-sm">{userPosts.length} posts</p>
           </div>
           <Settings className="w-6 h-6 dark:text-zinc-400 light:text-gray-600" />
         </div>
@@ -179,7 +288,7 @@ export default function Profile({ onNavigateToFollowers }: ProfileProps = {}) {
             </div>
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4" />
-              <span>{mockProfile.joined}</span>
+              <span>{profileData.joined}</span>
             </div>
           </div>
 
@@ -257,43 +366,72 @@ export default function Profile({ onNavigateToFollowers }: ProfileProps = {}) {
           </div>
 
           <TabsContent value="posts" className="m-0">
-            {profileData.posts.map((post, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-              >
-                <PostCard {...post} />
-              </motion.div>
-            ))}
+            {userPosts.length > 0 ? userPosts.map((post, index) => {
+              const formattedPost = {
+                author: profileData.name,
+                username: profileData.username,
+                department: profileData.department,
+                content: post.content,
+                avatar: profileData.avatar,
+                likes: post.likes_count || 0,
+                comments: post.comments_count || 0,
+                shares: post.shares_count || 0,
+                timeAgo: new Date(post.created_at).toLocaleDateString(),
+                image: post.media_urls?.[0] || undefined
+              };
+              return (
+                <motion.div
+                  key={post.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                >
+                  <PostCard {...formattedPost} />
+                </motion.div>
+              );
+            }) : (
+              <div className="text-center py-8">
+                <div className="text-4xl mb-4">📝</div>
+                <p className="text-muted-foreground">No posts yet</p>
+                <p className="text-sm text-muted-foreground mt-2">Share your first post to get started!</p>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="projects" className="m-0 p-4 space-y-3">
-            {profileData.projects.map((project, index) => (
-              <motion.div
-                key={project.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="dark:bg-zinc-900 light:bg-gray-50 rounded-2xl p-4 border dark:border-zinc-800 light:border-gray-200"
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <h4 className="dark:text-white light:text-black">{project.title}</h4>
-                  <Badge className={`text-xs ${
-                    project.status === "Active" 
-                      ? "bg-green-500/10 text-green-400 border-green-500/20" 
-                      : "dark:bg-zinc-700 dark:text-zinc-300 dark:border-zinc-600 light:bg-gray-200 light:text-gray-700 light:border-gray-400"
-                  }`}>
-                    {project.status}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-4 dark:text-zinc-400 light:text-gray-600 text-sm">
-                  <span>{project.team} members</span>
-                  <span>{project.likes} likes</span>
-                </div>
-              </motion.div>
-            ))}
+            {userPosts.filter(post => post.post_type === 'project').length > 0 ? (
+              userPosts.filter(post => post.post_type === 'project').map((project, index) => (
+                <motion.div
+                  key={project.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  className="dark:bg-zinc-900 light:bg-gray-50 rounded-2xl p-4 border dark:border-zinc-800 light:border-gray-200"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <h4 className="dark:text-white light:text-black">{project.project_title || 'Untitled Project'}</h4>
+                    <Badge className={`text-xs ${
+                      project.project_status === "active" 
+                        ? "bg-green-500/10 text-green-400 border-green-500/20" 
+                        : "dark:bg-zinc-700 dark:text-zinc-300 dark:border-zinc-600 light:bg-gray-200 light:text-gray-700 light:border-gray-400"
+                    }`}>
+                      {project.project_status || 'Unknown'}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-2">{project.content}</p>
+                  <div className="flex items-center gap-4 dark:text-zinc-400 light:text-gray-600 text-sm">
+                    <span>{project.team_size_needed || 0} members needed</span>
+                    <span>{project.likes_count || 0} likes</span>
+                  </div>
+                </motion.div>
+              ))
+            ) : (
+              <div className="text-center py-8">
+                <div className="text-4xl mb-4">🚀</div>
+                <p className="text-muted-foreground">No projects yet</p>
+                <p className="text-sm text-muted-foreground mt-2">Start your first project to collaborate with others!</p>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </motion.div>

@@ -3,6 +3,7 @@ import { ArrowLeft, MoreVertical, Send, Check, CheckCheck, Plus, Video, Phone, I
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { supabase } from "../lib/supabase";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +24,7 @@ interface Message {
 interface ChatConversationProps {
   onBack: () => void;
   user: {
+    id: string;
     name: string;
     username: string;
     avatar: string;
@@ -31,41 +33,51 @@ interface ChatConversationProps {
 }
 
 export default function ChatConversation({ onBack, user, onClearUnread }: ChatConversationProps) {
-  // Clear unread messages when chat opens
-  useEffect(() => {
-    onClearUnread?.();
-  }, [onClearUnread]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      text: "Hey! I saw your AI project post. Looks amazing!",
-      timestamp: "10:30 AM",
-      isSent: false,
-      status: "read",
-    },
-    {
-      id: 2,
-      text: "Thanks! Are you interested in collaborating?",
-      timestamp: "10:32 AM",
-      isSent: true,
-      status: "read",
-    },
-    {
-      id: 3,
-      text: "That sounds great! When can we meet?",
-      timestamp: "10:35 AM",
-      isSent: false,
-      status: "read",
-    },
-    {
-      id: 4,
-      text: "How about tomorrow at 3 PM in the library?",
-      timestamp: "10:37 AM",
-      isSent: true,
-      status: "delivered",
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchMessages();
+    onClearUnread?.();
+  }, [user.id]);
+
+  const fetchMessages = async () => {
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) return;
+      
+      setCurrentUserId(currentUser.id);
+
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${user.id}),and(sender_id.eq.${user.id},receiver_id.eq.${currentUser.id})`)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      const formattedMessages = data?.map((msg: any) => ({
+        id: msg.id,
+        text: msg.content,
+        timestamp: new Date(msg.created_at).toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit'
+        }),
+        isSent: msg.sender_id === currentUser.id,
+        status: msg.is_read ? 'read' : 'delivered',
+        image: msg.image_url,
+        video: msg.video_url
+      })) || [];
+
+      setMessages(formattedMessages);
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const [inputText, setInputText] = useState("");
   const [selectedMedia, setSelectedMedia] = useState<{
@@ -93,44 +105,35 @@ export default function ChatConversation({ onBack, user, onClearUnread }: ChatCo
     }
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!inputText.trim() && !selectedMedia) return;
 
-    const newMessage: Message = {
-      id: messages.length + 1,
-      text: selectedMedia 
+    try {
+      const messageContent = selectedMedia 
         ? `${selectedMedia.type === "image" ? "📷 Photo" : "🎥 Video"}${inputText ? `: ${inputText}` : ""}`
-        : inputText,
-      timestamp: new Date().toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-      }),
-      isSent: true,
-      status: "sent",
-      ...(selectedMedia && { [selectedMedia.type]: selectedMedia.url }),
-    };
+        : inputText;
 
-    setMessages([...messages, newMessage]);
-    setInputText("");
-    setSelectedMedia(null);
+      const { error } = await supabase
+        .from('messages')
+        .insert({
+          sender_id: currentUserId,
+          receiver_id: user.id,
+          content: messageContent,
+          message_type: selectedMedia ? selectedMedia.type : 'text',
+          image_url: selectedMedia?.type === 'image' ? selectedMedia.url : null,
+          video_url: selectedMedia?.type === 'video' ? selectedMedia.url : null
+        });
 
-    // Simulate message delivery
-    setTimeout(() => {
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === newMessage.id ? { ...msg, status: "delivered" } : msg
-        )
-      );
-    }, 1000);
+      if (error) throw error;
 
-    // Simulate message read
-    setTimeout(() => {
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === newMessage.id ? { ...msg, status: "read" } : msg
-        )
-      );
-    }, 3000);
+      setInputText("");
+      setSelectedMedia(null);
+      fetchMessages(); // Refresh messages
+      toast.success('Message sent!');
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast.error('Failed to send message');
+    }
   };
 
   const getTickIcon = (status: "sent" | "delivered" | "read") => {
@@ -190,7 +193,20 @@ export default function ChatConversation({ onBack, user, onClearUnread }: ChatCo
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-24">
-        {messages.map((message, index) => (
+        {loading ? (
+          <div className="flex items-center justify-center h-96">
+            <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full"></div>
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex items-center justify-center h-96">
+            <div className="text-center space-y-4">
+              <div className="text-4xl mb-4">💬</div>
+              <p className="text-muted-foreground">No messages yet</p>
+              <p className="text-sm text-muted-foreground">Start the conversation!</p>
+            </div>
+          </div>
+        ) : (
+          messages.map((message, index) => (
           <motion.div
             key={message.id}
             initial={{ opacity: 0, y: 20 }}
@@ -245,7 +261,8 @@ export default function ChatConversation({ onBack, user, onClearUnread }: ChatCo
               </div>
             </div>
           </motion.div>
-        ))}
+          ))
+        )}
       </div>
 
       {/* Input */}

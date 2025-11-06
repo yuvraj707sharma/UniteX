@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Settings, Plus } from "lucide-react";
 import PostCard from "./PostCard";
 import ProfileMenu from "./ProfileMenu";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { supabase } from "../lib/supabase";
 
 const mockPosts = [
   {
@@ -91,12 +92,34 @@ export default function HomeFeed({
   onNavigateToSpaces,
   onNavigateToOtherProfile
 }: HomeFeedProps) {
-  const currentUser = {
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alex",
-    name: "Alex Johnson",
-  };
-
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [showCreatePost, setShowCreatePost] = useState(false);
+
+  useEffect(() => {
+    fetchCurrentUser();
+  }, []);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (profile) {
+        setCurrentUser({
+          avatar: profile.avatar_url || '',
+          name: profile.full_name || 'User'
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching current user:', error);
+    }
+  };
 
   const handleCreatePost = () => {
     toast.success("Post created successfully!");
@@ -119,9 +142,9 @@ export default function HomeFeed({
           >
             <button className="p-0">
               <Avatar className="w-8 h-8">
-                <AvatarImage src={currentUser.avatar} />
+                <AvatarImage src={currentUser?.avatar} />
                 <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black text-sm">
-                  {currentUser.name.charAt(0)}
+                  {currentUser?.name?.charAt(0) || 'U'}
                 </AvatarFallback>
               </Avatar>
             </button>

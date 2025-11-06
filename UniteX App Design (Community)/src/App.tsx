@@ -259,7 +259,7 @@ export default function App() {
         }
         return <Notifications onNavigateToProfile={handleNavigateToOtherProfile} />;
       case "profile":
-        return <Profile onNavigateToFollowers={(tab) => handleNavigateToFollowers(tab, "alexjohnson", "Alex Johnson")} />;
+        return <Profile onNavigateToFollowers={(tab) => handleNavigateToFollowers(tab, currentUser?.username, currentUser?.full_name)} />;
       case "otherProfile":
         return (
           <OtherProfile

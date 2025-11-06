@@ -16,9 +16,10 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from 
 import { Badge } from "./ui/badge";
 import { Separator } from "./ui/separator";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden@1.1.0";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useTheme } from "../contexts/ThemeContext";
+import { supabase } from "../lib/supabase";
 
 interface ProfileMenuProps {
   onNavigateToProfile: () => void;
@@ -31,13 +32,7 @@ interface ProfileMenuProps {
   children: React.ReactNode;
 }
 
-const mockUser = {
-  name: "Alex Johnson",
-  username: "alexjohnson",
-  avatar: "/api/placeholder/150/150", // This will be replaced with real uploaded images
-  followers: 234,
-  following: 156,
-};
+
 
 export default function ProfileMenu({
   onNavigateToProfile,
@@ -50,8 +45,49 @@ export default function ProfileMenu({
   children,
 }: ProfileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const { theme, setTheme } = useTheme();
   const isDarkMode = theme === "dark";
+
+  useEffect(() => {
+    fetchCurrentUser();
+  }, []);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (profile) {
+        // Fetch follower counts
+        const { data: followers } = await supabase
+          .from('follows')
+          .select('id')
+          .eq('followed_id', user.id);
+
+        const { data: following } = await supabase
+          .from('follows')
+          .select('id')
+          .eq('follower_id', user.id);
+
+        setCurrentUser({
+          name: profile.full_name || 'User',
+          username: profile.username || 'user',
+          avatar: profile.avatar_url || '',
+          followers: followers?.length || 0,
+          following: following?.length || 0
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching current user:', error);
+    }
+  };
 
   const toggleTheme = () => {
     setTheme(isDarkMode ? "light" : "dark");
@@ -81,24 +117,24 @@ export default function ProfileMenu({
           {/* User Info */}
           <div className="p-4 space-y-4">
             <Avatar className="w-12 h-12">
-              <AvatarImage src={mockUser.avatar} alt={mockUser.name} />
+              <AvatarImage src={currentUser?.avatar} alt={currentUser?.name} />
               <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black">
-                {mockUser.name.charAt(0)}
+                {currentUser?.name?.charAt(0) || 'U'}
               </AvatarFallback>
             </Avatar>
 
             <div>
-              <h3 className="text-foreground">{mockUser.name}</h3>
-              <p className="text-muted-foreground text-sm">@{mockUser.username}</p>
+              <h3 className="text-foreground">{currentUser?.name || 'Loading...'}</h3>
+              <p className="text-muted-foreground text-sm">@{currentUser?.username || 'user'}</p>
             </div>
 
             <div className="flex items-center gap-4 text-sm">
               <div>
-                <span className="text-foreground">{mockUser.following}</span>
+                <span className="text-foreground">{currentUser?.following || 0}</span>
                 <span className="text-muted-foreground"> Following</span>
               </div>
               <div>
-                <span className="text-foreground">{mockUser.followers}</span>
+                <span className="text-foreground">{currentUser?.followers || 0}</span>
                 <span className="text-muted-foreground"> Followers</span>
               </div>
             </div>

@@ -10,29 +10,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { supabase } from "../lib/supabase";
 
-const mockLists = [
-  {
-    id: 1,
-    name: "AI Enthusiasts",
-    description: "People working on AI projects",
-    memberCount: 12,
-    isPrivate: false,
-  },
-  {
-    id: 2,
-    name: "Startup Founders",
-    description: "Student entrepreneurs",
-    memberCount: 8,
-    isPrivate: true,
-  },
-  {
-    id: 3,
-    name: "Design Inspiration",
-    description: "Best designers on campus",
-    memberCount: 15,
-    isPrivate: false,
-  },
-];
+// Removed mock data - using real database only
 
 interface ListsProps {
   onBack: () => void;
@@ -57,7 +35,7 @@ export default function Lists({ onBack }: ListsProps) {
       setLists(data || []);
     } catch (error) {
       console.error('Error fetching lists:', error);
-      setLists(mockLists);
+      setLists([]);
     } finally {
       setLoading(false);
     }

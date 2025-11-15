@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowLeft, Users, Bell, BellOff, MoreVertical, Search } from "lucide-react";
 import { Button } from "./ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
@@ -6,10 +6,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import PostCard from "./PostCard";
+import { supabase } from "../lib/supabase";
 
 interface CommunityDetailProps {
   community: {
-    id: number;
+    id: string;
     name: string;
     members: number;
     description: string;
@@ -20,85 +21,64 @@ interface CommunityDetailProps {
   onToggleJoin: () => void;
 }
 
-const mockPosts = [
-  {
-    author: "Sarah Johnson",
-    username: "sarahj",
-    department: "CS",
-    content: "Just launched my new web app project! Looking for feedback from the community. 🚀",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah",
-    likes: 45,
-    comments: 12,
-    shares: 5,
-    timeAgo: "2h ago",
-  },
-  {
-    author: "Mike Chen",
-    username: "mikechen",
-    department: "CS",
-    content: "Anyone interested in collaborating on an AI chatbot project? I have experience with OpenAI APIs.",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Mike",
-    likes: 32,
-    comments: 18,
-    shares: 3,
-    timeAgo: "5h ago",
-  },
-  {
-    author: "Emma Davis",
-    username: "emmad",
-    department: "CS",
-    content: "Great discussion in today's ML workshop! Here are my notes for anyone who missed it.",
-    image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&h=400&fit=crop",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Emma",
-    likes: 67,
-    comments: 24,
-    shares: 15,
-    timeAgo: "1d ago",
-  },
-];
-
-const mockMembers = [
-  {
-    id: 1,
-    name: "Sarah Johnson",
-    username: "sarahj",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah",
-    role: "Admin",
-  },
-  {
-    id: 2,
-    name: "Mike Chen",
-    username: "mikechen",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Mike",
-    role: "Moderator",
-  },
-  {
-    id: 3,
-    name: "Emma Davis",
-    username: "emmad",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Emma",
-    role: "Member",
-  },
-  {
-    id: 4,
-    name: "Alex Kumar",
-    username: "alexk",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alex",
-    role: "Member",
-  },
-  {
-    id: 5,
-    name: "Lisa Park",
-    username: "lisap",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Lisa",
-    role: "Member",
-  },
-];
-
 export default function CommunityDetail({ community, onBack, onToggleJoin }: CommunityDetailProps) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("posts");
+  const [members, setMembers] = useState<any[]>([]);
+  const [posts, setPosts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchMembers();
+    fetchPosts();
+  }, [community.id]);
+
+  const fetchMembers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('community_members')
+        .select(`
+          id,
+          user_id,
+          joined_at,
+          profiles:user_id (
+            id,
+            full_name,
+            username,
+            avatar_url
+          )
+        `)
+        .eq('community_id', community.id)
+        .order('joined_at', { ascending: false });
+
+      if (error) throw error;
+
+      const formattedMembers = data?.map(member => ({
+        id: member.user_id,
+        name: member.profiles?.full_name || 'Unknown User',
+        username: member.profiles?.username || 'unknown',
+        avatar: member.profiles?.avatar_url || '',
+        role: 'Member' // You can add role logic later
+      })) || [];
+
+      setMembers(formattedMembers);
+    } catch (error) {
+      console.error('Error fetching members:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchPosts = async () => {
+    try {
+      // For now, posts don't have community_id field
+      // This will be implemented when community posts feature is added
+      setPosts([]);
+    } catch (error) {
+      console.error('Error fetching posts:', error);
+    }
+  };
 
   const toggleNotifications = () => {
     setNotificationsEnabled(!notificationsEnabled);
@@ -204,67 +184,100 @@ export default function CommunityDetail({ community, onBack, onToggleJoin }: Com
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
           >
-            {mockPosts
-              .filter((post) => {
-                if (!searchQuery || searchQuery === "search") return true;
-                return (
-                  post.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  post.author.toLowerCase().includes(searchQuery.toLowerCase())
-                );
-              })
-              .map((post, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-              >
-                <PostCard {...post} />
-              </motion.div>
-            ))}
+            {posts.length === 0 ? (
+              <div className="flex items-center justify-center h-96">
+                <div className="text-center space-y-4">
+                  <div className="text-6xl mb-4">📝</div>
+                  <h2 className="text-foreground text-xl">No posts yet</h2>
+                  <p className="text-muted-foreground max-w-sm">
+                    Be the first to post in this community!
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    (Community posts feature coming soon)
+                  </p>
+                </div>
+              </div>
+            ) : (
+              posts
+                .filter((post) => {
+                  if (!searchQuery || searchQuery === "search") return true;
+                  return (
+                    post.content?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    post.author?.toLowerCase().includes(searchQuery.toLowerCase())
+                  );
+                })
+                .map((post, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                  >
+                    <PostCard {...post} />
+                  </motion.div>
+                ))
+            )}
           </motion.div>
         </TabsContent>
 
         {/* Members Tab */}
         <TabsContent value="members" className="m-0 p-4">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3 }}
-            className="space-y-3"
-          >
-            {mockMembers
-              .filter((member) => {
-                if (!searchQuery || searchQuery === "search") return true;
-                return (
-                  member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  member.username.toLowerCase().includes(searchQuery.toLowerCase())
-                );
-              })
-              .map((member, index) => (
-              <motion.div
-                key={member.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.05 }}
-                className="flex items-center gap-3 p-3 rounded-xl dark:bg-zinc-900 light:bg-gray-50 border dark:border-zinc-800 light:border-gray-200"
-              >
-                <Avatar className="w-12 h-12">
-                  <AvatarImage src={member.avatar} />
-                  <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black">
-                    {member.name.charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <p className="text-foreground truncate">{member.name}</p>
-                  <p className="text-muted-foreground text-sm">@{member.username}</p>
+          {loading ? (
+            <div className="flex items-center justify-center h-96">
+              <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full"></div>
+            </div>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3 }}
+              className="space-y-3"
+            >
+              {members.length === 0 ? (
+                <div className="flex items-center justify-center h-96">
+                  <div className="text-center space-y-4">
+                    <div className="text-6xl mb-4">👥</div>
+                    <h2 className="text-foreground text-xl">No members yet</h2>
+                    <p className="text-muted-foreground max-w-sm">
+                      Be the first to join this community!
+                    </p>
+                  </div>
                 </div>
-                <span className="text-xs dark:bg-blue-500/10 light:bg-red-50 dark:text-blue-400 light:text-red-600 px-3 py-1 rounded-full">
-                  {member.role}
-                </span>
-              </motion.div>
-            ))}
-          </motion.div>
+              ) : (
+                members
+                  .filter((member) => {
+                    if (!searchQuery || searchQuery === "search") return true;
+                    return (
+                      member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      member.username.toLowerCase().includes(searchQuery.toLowerCase())
+                    );
+                  })
+                  .map((member, index) => (
+                    <motion.div
+                      key={member.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className="flex items-center gap-3 p-3 rounded-xl dark:bg-zinc-900 light:bg-gray-50 border dark:border-zinc-800 light:border-gray-200"
+                    >
+                      <Avatar className="w-12 h-12">
+                        <AvatarImage src={member.avatar} />
+                        <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black">
+                          {member.name.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-foreground truncate">{member.name}</p>
+                        <p className="text-muted-foreground text-sm">@{member.username}</p>
+                      </div>
+                      <span className="text-xs dark:bg-blue-500/10 light:bg-red-50 dark:text-blue-400 light:text-red-600 px-3 py-1 rounded-full">
+                        {member.role}
+                      </span>
+                    </motion.div>
+                  ))
+              )}
+            </motion.div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

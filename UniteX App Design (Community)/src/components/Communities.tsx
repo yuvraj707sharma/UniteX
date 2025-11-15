@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Settings, Plus } from "lucide-react";
+import { Search, Settings, Plus, MoreVertical, Trash2, Edit } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -7,6 +7,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import CommunityDetail from "./CommunityDetail";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 
 const initialCommunities: any[] = [];
 
@@ -74,6 +80,7 @@ export default function Communities() {
         description: community.description,
         members: community.members_count || 0,
         joined: joinedCommunityIds.includes(community.id),
+        creator_id: community.creator_id,
         color: 'from-blue-500 to-purple-500' // You can add color to DB later
       })) || [];
 
@@ -122,6 +129,7 @@ export default function Communities() {
       toast.success(`Created ${communityForm.name}!`);
       setCommunityForm({ name: '', description: '' });
       setShowCreateCommunity(false);
+      setActiveTab('joined'); // Switch to Joined tab to see the new community
       fetchCommunities();
     } catch (error) {
       console.error('Error creating community:', error);
@@ -171,8 +179,54 @@ export default function Communities() {
     }
   };
 
+  const handleDeleteCommunity = async (communityId: string, communityName: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Check if user is the creator
+      const community = communities.find(c => c.id === communityId);
+      if (!community) return;
+
+      // Get creator_id from database
+      const { data: communityData } = await supabase
+        .from('communities')
+        .select('creator_id')
+        .eq('id', communityId)
+        .single();
+
+      if (communityData?.creator_id !== user.id) {
+        toast.error('Only the creator can delete this community');
+        return;
+      }
+
+      // Confirm deletion
+      if (!confirm(`Are you sure you want to delete "${communityName}"? This cannot be undone.`)) {
+        return;
+      }
+
+      // Delete community (cascade will delete members)
+      const { error } = await supabase
+        .from('communities')
+        .delete()
+        .eq('id', communityId);
+
+      if (error) throw error;
+
+      toast.success(`Deleted ${communityName}`);
+      fetchCommunities();
+    } catch (error) {
+      console.error('Error deleting community:', error);
+      toast.error('Failed to delete community');
+    }
+  };
+
   const handleCommunityClick = (community: typeof initialCommunities[0]) => {
     setSelectedCommunity(community);
+  };
+
+  const handleEditCommunity = async (communityId: string) => {
+    // TO DO: implement edit community functionality
   };
 
   // If a community is selected, show its detail view
@@ -261,6 +315,18 @@ export default function Communities() {
                     </Badge>
                   </div>
                 </div>
+                {community.creator_id === currentUser?.id && (
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteCommunity(community.id, community.name);
+                    }}
+                    variant="outline"
+                    className="dark:bg-transparent dark:border-zinc-700 dark:text-white dark:hover:bg-zinc-900 light:bg-transparent light:border-gray-300 light:text-black light:hover:bg-gray-100 rounded-full px-6 h-9"
+                  >
+                    Delete
+                  </Button>
+                )}
                 <Button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -320,6 +386,18 @@ export default function Communities() {
                 </div>
 
                 {/* Join Button */}
+                {community.creator_id === currentUser?.id && (
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteCommunity(community.id, community.name);
+                    }}
+                    variant="outline"
+                    className="dark:bg-transparent dark:border-zinc-700 dark:text-white dark:hover:bg-zinc-900 light:bg-transparent light:border-gray-300 light:text-black light:hover:bg-gray-100 rounded-full px-6 h-9"
+                  >
+                    Delete
+                  </Button>
+                )}
                 <Button
                   onClick={(e) => {
                     e.stopPropagation();

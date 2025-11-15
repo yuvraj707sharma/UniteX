@@ -100,6 +100,8 @@ export default function PostCard({
 
   const fetchReposts = async () => {
     try {
+      if (!id) return; // Skip if post ID is undefined
+      
       const { count } = await supabase
         .from('reposts')
         .select('*', { count: 'exact', head: true })
@@ -170,6 +172,8 @@ export default function PostCard({
 
   const fetchLikeStatus = async () => {
     try {
+      if (!id) return; // Skip if post ID is undefined
+      
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -195,6 +199,8 @@ export default function PostCard({
 
   const fetchBookmarkStatus = async () => {
     try {
+      if (!id) return; // Skip if post ID is undefined
+      
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 

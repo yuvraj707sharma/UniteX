@@ -4,24 +4,75 @@ import { Input } from "./ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from '../lib/supabase';
 
 interface AccountSettingsProps {
   onBack: () => void;
 }
 
 export default function AccountSettings({ onBack }: AccountSettingsProps) {
-  const [name, setName] = useState("Alex Johnson");
-  const [email, setEmail] = useState("alex.johnson@jecrc.edu");
-  const [username, setUsername] = useState("alexjohnson");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
+  const [loading, setLoading] = useState(true);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [showVerificationDialog, setShowVerificationDialog] = useState(false);
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  const handleSave = () => {
-    toast.success("Account information updated!");
+  useEffect(() => {
+    fetchUserData();
+  }, []);
+
+  const fetchUserData = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (profile) {
+        setName(profile.full_name || '');
+        setEmail(profile.email || '');
+        setUsername(profile.username || '');
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Please log in to update your account');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: name,
+          username: username,
+          email: email
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      toast.success("Account information updated!");
+    } catch (error) {
+      console.error('Error updating account:', error);
+      toast.error('Failed to update account information');
+    }
   };
 
   const handleChangePassword = () => {
@@ -57,12 +108,17 @@ export default function AccountSettings({ onBack }: AccountSettingsProps) {
         </div>
       </div>
 
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.3 }}
-        className="p-4 space-y-6"
-      >
+      {loading ? (
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full"></div>
+        </div>
+      ) : (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+          className="p-4 space-y-6"
+        >
         {/* Name */}
         <div className="space-y-2">
           <label className="text-foreground flex items-center gap-2">
@@ -141,7 +197,8 @@ export default function AccountSettings({ onBack }: AccountSettingsProps) {
             </div>
           </button>
         </div>
-      </motion.div>
+        </motion.div>
+      )}
 
       {/* Change Password Dialog */}
       <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>

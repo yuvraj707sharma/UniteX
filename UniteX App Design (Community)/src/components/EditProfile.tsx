@@ -208,17 +208,17 @@ export default function EditProfile({ onBack, profile, onSave }: EditProfileProp
         {/* Avatar */}
         <div className="flex flex-col items-center space-y-4">
           <div className="relative">
-            <Avatar className="w-24 h-24">
-              <AvatarImage src={avatarPreview} />
-              <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black text-2xl">
+            <Avatar className="w-32 h-32 border-4 border-border">
+              <AvatarImage src={avatarPreview} className="object-cover" />
+              <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black text-3xl">
                 {formData.name.charAt(0)}
               </AvatarFallback>
             </Avatar>
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="absolute -bottom-2 -right-2 w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center"
+              className="absolute bottom-0 right-0 w-10 h-10 dark:bg-blue-500 light:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform border-2 dark:border-black light:border-white"
             >
-              <Camera className="w-4 h-4" />
+              <Camera className="w-5 h-5" />
             </button>
           </div>
           <input
@@ -228,9 +228,12 @@ export default function EditProfile({ onBack, profile, onSave }: EditProfileProp
             onChange={handleAvatarChange}
             className="hidden"
           />
-          <p className="text-muted-foreground text-sm text-center">
-            Click the camera icon to change your profile photo
-          </p>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="px-4 py-2 text-sm dark:bg-zinc-800 light:bg-gray-200 dark:text-white light:text-black rounded-lg hover:opacity-80 transition-opacity"
+          >
+            Change Profile Photo
+          </button>
         </div>
 
         {/* Form Fields */}

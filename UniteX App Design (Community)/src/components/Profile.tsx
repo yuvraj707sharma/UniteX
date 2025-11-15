@@ -166,7 +166,7 @@ export default function Profile({ onNavigateToFollowers, onNavigateToSettings }:
           {/* Avatar and Stats */}
           <div className="flex items-start justify-between mb-4">
             <Avatar className="w-20 h-20 border-4 dark:border-zinc-800 light:border-gray-200">
-              <AvatarImage src={profileData.avatar} />
+              <AvatarImage src={profileData.avatar} className="object-cover" />
               <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black text-2xl">
                 {profileData.name.charAt(0)}
               </AvatarFallback>
@@ -293,6 +293,7 @@ export default function Profile({ onNavigateToFollowers, onNavigateToSettings }:
           <TabsContent value="posts" className="m-0">
             {userPosts.length > 0 ? userPosts.map((post, index) => {
               const formattedPost = {
+                id: post.id,
                 author: profileData.name,
                 username: profileData.username,
                 department: profileData.department,
@@ -301,6 +302,7 @@ export default function Profile({ onNavigateToFollowers, onNavigateToSettings }:
                 likes: post.likes_count || 0,
                 comments: post.comments_count || 0,
                 shares: post.shares_count || 0,
+                reposts: 0,
                 timeAgo: new Date(post.created_at).toLocaleDateString(),
                 image: post.media_urls?.[0] || undefined
               };

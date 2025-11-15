@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Heart, MessageCircle, Share2, Bookmark, Send, Link2, Repeat2, Search } from "lucide-react";
 import { motion } from "framer-motion";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
@@ -15,8 +15,10 @@ import {
 } from "./ui/dropdown-menu";
 import { toast } from "sonner";
 import { sanitizeHtml, containsMaliciousContent } from '../utils/sanitize';
+import { supabase } from '../lib/supabase';
 
 interface PostCardProps {
+  id: string;
   author: string;
   username: string;
   department: string;
@@ -26,11 +28,13 @@ interface PostCardProps {
   likes: number;
   comments: number;
   shares: number;
+  reposts?: number;
   timeAgo: string;
   onNavigateToProfile?: (username: string) => void;
 }
 
 export default function PostCard({
+  id,
   author,
   username,
   department,
@@ -40,6 +44,7 @@ export default function PostCard({
   likes: initialLikes,
   comments: initialComments,
   shares: initialShares,
+  reposts: initialReposts = 0,
   timeAgo,
   onNavigateToProfile,
 }: PostCardProps) {
@@ -48,48 +53,262 @@ export default function PostCard({
   const [bookmarked, setBookmarked] = useState(false);
   const [comments, setComments] = useState(initialComments);
   const [shares, setShares] = useState(initialShares);
+  const [reposts, setReposts] = useState(initialReposts);
   const [reposted, setReposted] = useState(false);
-  const [reposts, setReposts] = useState(Math.floor(Math.random() * 50));
   const [showCommentDialog, setShowCommentDialog] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [showQuoteDialog, setShowQuoteDialog] = useState(false);
   const [quoteText, setQuoteText] = useState("");
   const [shareSearchQuery, setShareSearchQuery] = useState("");
   const [commentText, setCommentText] = useState("");
-  const [postComments, setPostComments] = useState([
-    {
-      id: 1,
-      author: "John Doe",
-      username: "johnd",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=John",
-      text: "Great post! Very insightful.",
-      timeAgo: "1h ago",
-      likes: 12,
-      liked: false,
-    },
-    {
-      id: 2,
-      author: "Jane Smith",
-      username: "janes",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Jane",
-      text: "I'd love to collaborate on this!",
-      timeAgo: "3h ago",
-      likes: 8,
-      liked: false,
-    },
-  ]);
+  const [postComments, setPostComments] = useState<any[]>([]);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [realUsers, setRealUsers] = useState<any[]>([]);
 
-  const handleLike = () => {
-    setLiked(!liked);
-    setLikes(liked ? likes - 1 : likes + 1);
-    toast.success(liked ? "Unliked" : "Liked!");
+  useEffect(() => {
+    fetchCurrentUser();
+    fetchReposts();
+    fetchRealUsers();
+    fetchLikeStatus();
+    fetchBookmarkStatus();
+  }, []);
+
+  useEffect(() => {
+    if (showCommentDialog) {
+      fetchComments();
+    }
+  }, [showCommentDialog]);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (profile) {
+        setCurrentUser(profile);
+      }
+    } catch (error) {
+      console.error('Error fetching current user:', error);
+    }
+  };
+
+  const fetchReposts = async () => {
+    try {
+      const { count } = await supabase
+        .from('reposts')
+        .select('*', { count: 'exact', head: true })
+        .eq('post_id', id);
+
+      setReposts(count || 0);
+
+      // Check if current user has reposted
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase
+          .from('reposts')
+          .select('id')
+          .eq('post_id', id)
+          .eq('user_id', user.id)
+          .single();
+        
+        setReposted(!!data);
+      }
+    } catch (error) {
+      console.error('Error fetching reposts:', error);
+    }
+  };
+
+  const fetchComments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('comments')
+        .select(`
+          *,
+          profiles(full_name, username, avatar_url)
+        `)
+        .eq('post_id', id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const formattedComments = data?.map(comment => ({
+        id: comment.id,
+        author: comment.profiles.full_name || 'Unknown User',
+        username: comment.profiles.username || 'unknown',
+        avatar: comment.profiles.avatar_url || '',
+        text: comment.content,
+        timeAgo: new Date(comment.created_at).toLocaleDateString(),
+        likes: comment.likes_count || 0,
+        liked: false
+      })) || [];
+
+      setPostComments(formattedComments);
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+    }
+  };
+
+  const fetchRealUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name, username, avatar_url');
+
+      if (error) throw error;
+
+      setRealUsers(data);
+    } catch (error) {
+      console.error('Error fetching real users:', error);
+    }
+  };
+
+  const fetchLikeStatus = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('post_likes')
+        .select('id')
+        .eq('post_id', id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Error fetching like status:', error);
+        setLiked(false);
+        return;
+      }
+      
+      setLiked(!!data);
+    } catch (error) {
+      console.error('Error in fetchLikeStatus:', error);
+      setLiked(false);
+    }
+  };
+
+  const fetchBookmarkStatus = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('bookmarks')
+        .select('id')
+        .eq('post_id', id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Error fetching bookmark status:', error);
+        setBookmarked(false);
+        return;
+      }
+      
+      setBookmarked(!!data);
+    } catch (error) {
+      console.error('Error in fetchBookmarkStatus:', error);
+      setBookmarked(false);
+    }
+  };
+
+  const handleLike = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Please log in to like');
+        return;
+      }
+
+      if (liked) {
+        const { error } = await supabase
+          .from('post_likes')
+          .delete()
+          .eq('post_id', id)
+          .eq('user_id', user.id);
+        
+        if (error) {
+          console.error('Error deleting like:', error);
+          throw error;
+        }
+        
+        setLiked(false);
+        setLikes(likes - 1);
+        toast.success("Unliked!");
+        
+        // Update the post's like count in database
+        const { error: updateError } = await supabase
+          .from('posts')
+          .update({ likes_count: Math.max(0, likes - 1) })
+          .eq('id', id);
+        
+        if (updateError) {
+          console.error('Error updating likes_count:', updateError);
+        }
+      } else {
+        const { error } = await supabase
+          .from('post_likes')
+          .insert({
+            post_id: id,
+            user_id: user.id,
+          });
+        
+        if (error) {
+          console.error('Error inserting like:', error);
+          console.error('Error details:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code
+          });
+          throw error;
+        }
+        
+        setLiked(true);
+        setLikes(likes + 1);
+        toast.success("Liked!");
+        
+        // Update the post's like count in database
+        const { error: updateError } = await supabase
+          .from('posts')
+          .update({ likes_count: likes + 1 })
+          .eq('id', id);
+        
+        if (updateError) {
+          console.error('Error updating likes_count:', updateError);
+        }
+      }
+      
+      // Fetch updated count from database to ensure accuracy
+      setTimeout(async () => {
+        const { data } = await supabase
+          .from('posts')
+          .select('likes_count')
+          .eq('id', id)
+          .single();
+        
+        if (data) {
+          setLikes(data.likes_count || 0);
+        }
+      }, 500);
+    } catch (error) {
+      console.error('Error liking post:', error);
+      console.error('Full error object:', JSON.stringify(error, null, 2));
+      toast.error('Failed to like post');
+    }
   };
 
   const handleComment = () => {
     setShowCommentDialog(true);
   };
 
-  const handlePostComment = () => {
+  const handlePostComment = async () => {
     try {
       const trimmedText = commentText.trim();
       if (!trimmedText) {
@@ -102,30 +321,72 @@ export default function PostCard({
         return;
       }
 
-      // Check for malicious content
       if (containsMaliciousContent(trimmedText)) {
         toast.error('Comment contains invalid content');
         return;
       }
       
-      // Sanitize comment text to prevent XSS
+      if (!currentUser) {
+        toast.error('Please log in to comment');
+        return;
+      }
+
       const sanitizedText = sanitizeHtml(trimmedText);
 
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Please log in to comment');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('comments')
+        .insert({
+          post_id: id,
+          author_id: user.id,
+          content: sanitizedText
+        });
+
+      if (error) throw error;
+
+      // Update comment count in posts table
+      const newCommentCount = comments + 1;
+      const { error: updateError } = await supabase
+        .from('posts')
+        .update({ comments_count: newCommentCount })
+        .eq('id', id);
+
+      if (updateError) console.error('Error updating comment count:', updateError);
+
+      // Add comment to local state
       const newComment = {
-        id: postComments.length + 1,
-        author: "You",
-        username: "you",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=You",
+        id: Date.now().toString(),
+        author: currentUser.full_name || 'You',
+        username: currentUser.username || 'you',
+        avatar: currentUser.avatar_url || '',
         text: sanitizedText,
-        timeAgo: "Just now",
+        timeAgo: 'Just now',
         likes: 0,
         liked: false,
       };
 
       setPostComments([newComment, ...postComments]);
-      setComments(comments + 1);
+      setComments(newCommentCount);
       setCommentText("");
       toast.success("Comment posted!");
+      
+      // Fetch updated count from database to ensure accuracy
+      setTimeout(async () => {
+        const { data } = await supabase
+          .from('posts')
+          .select('comments_count')
+          .eq('id', id)
+          .single();
+        
+        if (data) {
+          setComments(data.comments_count || 0);
+        }
+      }, 500);
     } catch (error) {
       console.error('Error posting comment:', error);
       toast.error('Failed to post comment');
@@ -177,15 +438,70 @@ export default function PostCard({
     }
   };
 
-  const handleRepost = () => {
-    setReposted(!reposted);
-    setReposts(reposted ? reposts - 1 : reposts + 1);
-    toast.success(reposted ? "Repost removed" : "Reposted!");
+  const handleRepost = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Please log in to repost');
+        return;
+      }
+
+      if (reposted) {
+        await supabase
+          .from('reposts')
+          .delete()
+          .eq('post_id', id)
+          .eq('user_id', user.id);
+        setReposted(false);
+        setReposts(reposts - 1);
+        toast.success("Repost removed!");
+      } else {
+        await supabase
+          .from('reposts')
+          .insert({
+            post_id: id,
+            user_id: user.id,
+          });
+        setReposted(true);
+        setReposts(reposts + 1);
+        toast.success("Reposted!");
+      }
+    } catch (error) {
+      console.error('Error reposting:', error);
+      toast.error('Failed to repost');
+    }
   };
 
-  const handleBookmark = () => {
-    setBookmarked(!bookmarked);
-    toast.success(bookmarked ? "Removed from bookmarks" : "Added to bookmarks");
+  const handleBookmark = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Please log in to bookmark');
+        return;
+      }
+
+      if (bookmarked) {
+        await supabase
+          .from('bookmarks')
+          .delete()
+          .eq('post_id', id)
+          .eq('user_id', user.id);
+        setBookmarked(false);
+        toast.success("Removed from bookmarks!");
+      } else {
+        await supabase
+          .from('bookmarks')
+          .insert({
+            post_id: id,
+            user_id: user.id,
+          });
+        setBookmarked(true);
+        toast.success("Added to bookmarks!");
+      }
+    } catch (error) {
+      console.error('Error bookmarking post:', error);
+      toast.error('Failed to bookmark post');
+    }
   };
 
   const handleQuoteRepost = () => {
@@ -266,7 +582,7 @@ export default function PostCard({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  className={`flex items-center gap-2 transition-colors group ${
+                  className={`flex items-center gap-2 transition-colors ${
                     reposted ? "text-green-500" : "hover:text-green-500"
                   }`}
                 >
@@ -388,34 +704,28 @@ export default function PostCard({
             {/* UniteX Chats List */}
             <div className="space-y-2 max-h-60 overflow-y-auto">
               <p className="text-muted-foreground text-sm px-2">Share to UniteX</p>
-              {[
-                { name: "Sydney Sweeny", username: "sydneysweeny", avatar: "Sydney" },
-                { name: "Simran", username: "simran", avatar: "Simran" },
-                { name: "Dheemant Agarwal", username: "dheemant", avatar: "Dheemant" },
-                { name: "Deepak", username: "deepak", avatar: "Deepak" },
-                { name: "Yuvraj", username: "yuvraj", avatar: "Yuvraj" },
-              ]
-                .filter((chat) =>
+              {realUsers
+                .filter((user) =>
                   shareSearchQuery
-                    ? chat.name.toLowerCase().includes(shareSearchQuery.toLowerCase()) ||
-                      chat.username.toLowerCase().includes(shareSearchQuery.toLowerCase())
+                    ? user.full_name.toLowerCase().includes(shareSearchQuery.toLowerCase()) ||
+                      user.username.toLowerCase().includes(shareSearchQuery.toLowerCase())
                     : true
                 )
-                .map((chat) => (
+                .map((user) => (
                   <button
-                    key={chat.username}
-                    onClick={() => handleShareToChat(chat.name)}
+                    key={user.username}
+                    onClick={() => handleShareToChat(user.full_name)}
                     className="w-full flex items-center gap-3 p-3 rounded-xl dark:hover:bg-zinc-800 light:hover:bg-gray-100 transition-colors"
                   >
                     <Avatar className="w-10 h-10">
-                      <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${chat.avatar}`} />
+                      <AvatarImage src={user.avatar_url} />
                       <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black">
-                        {chat.name.charAt(0)}
+                        {user.full_name.charAt(0)}
                       </AvatarFallback>
                     </Avatar>
                     <div className="text-left flex-1">
-                      <p className="text-foreground">{chat.name}</p>
-                      <p className="text-muted-foreground text-sm">@{chat.username}</p>
+                      <p className="text-foreground">{user.full_name}</p>
+                      <p className="text-muted-foreground text-sm">@{user.username}</p>
                     </div>
                     <Send className="w-4 h-4 text-muted-foreground" />
                   </button>
@@ -508,9 +818,9 @@ export default function PostCard({
           <div className="px-4 py-3 border-t dark:border-zinc-800 light:border-gray-200 bg-background">
             <div className="flex gap-2">
               <Avatar className="w-10 h-10">
-                <AvatarImage src="https://api.dicebear.com/7.x/avataaars/svg?seed=You" />
+                <AvatarImage src={currentUser?.avatar_url || ''} />
                 <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black">
-                  Y
+                  {currentUser?.full_name?.charAt(0) || 'U'}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 flex gap-2">
@@ -572,7 +882,7 @@ export default function PostCard({
                     {author.charAt(0)}
                   </AvatarFallback>
                 </Avatar>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1">
                   <div className="flex items-center gap-1 text-sm">
                     <span className="text-foreground font-medium">{author}</span>
                     <span className="text-muted-foreground">@{username}</span>

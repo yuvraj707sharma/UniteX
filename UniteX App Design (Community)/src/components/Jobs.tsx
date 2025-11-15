@@ -9,45 +9,14 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { supabase } from "../lib/supabase";
 
-const mockJobs = [
-  {
-    id: 1,
-    title: "Full-Stack Developer Intern",
-    company: "TechStartup Inc.",
-    location: "Remote",
-    type: "Internship",
-    salary: "$15-20/hr",
-    posted: "2 days ago",
-    description: "Looking for a passionate full-stack developer to join our team.",
-  },
-  {
-    id: 2,
-    title: "UI/UX Designer",
-    company: "Design Studio",
-    location: "Hybrid",
-    type: "Part-time",
-    salary: "$25-30/hr",
-    posted: "1 week ago",
-    description: "Create beautiful user experiences for our clients.",
-  },
-  {
-    id: 3,
-    title: "Data Science Intern",
-    company: "Analytics Co.",
-    location: "On-site",
-    type: "Internship",
-    salary: "$18-22/hr",
-    posted: "3 days ago",
-    description: "Work on machine learning projects with real-world data.",
-  },
-];
+
 
 interface JobsProps {
   onBack: () => void;
 }
 
 export default function Jobs({ onBack }: JobsProps) {
-  const [jobs, setJobs] = useState<any[]>(mockJobs);
+  const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPostJob, setShowPostJob] = useState(false);
   const [showApplyDialog, setShowApplyDialog] = useState(false);
@@ -76,10 +45,10 @@ export default function Jobs({ onBack }: JobsProps) {
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      setJobs(data || mockJobs);
+      setJobs(data || []);
     } catch (error) {
       console.error('Error fetching jobs:', error);
-      setJobs(mockJobs);
+      setJobs([]);
     } finally {
       setLoading(false);
     }

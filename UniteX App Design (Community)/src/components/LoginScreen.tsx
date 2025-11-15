@@ -57,7 +57,8 @@ export default function LoginScreen({ onLogin, onNeedsOnboarding }: LoginScreenP
         const { error: signInError } = await supabase.auth.signInWithOtp({
           email: email,
           options: {
-            shouldCreateUser: false
+            shouldCreateUser: false,
+            emailRedirectTo: 'unitex://auth/callback'
           }
         });
         
@@ -73,7 +74,8 @@ export default function LoginScreen({ onLogin, onNeedsOnboarding }: LoginScreenP
         const { error: signUpError } = await supabase.auth.signInWithOtp({
           email: email,
           options: {
-            shouldCreateUser: true
+            shouldCreateUser: true,
+            emailRedirectTo: 'unitex://auth/callback'
           }
         });
         

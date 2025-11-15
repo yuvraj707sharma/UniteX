@@ -59,19 +59,37 @@ export default function Messages({ initialChat, onClearUnread, onChatStateChange
         .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching messages:', error);
+        setConversations([]);
+        setLoading(false);
+        return;
+      }
+
+      if (!messages || messages.length === 0) {
+        console.log('No messages found');
+        setConversations([]);
+        setLoading(false);
+        return;
+      }
 
       const conversationMap = new Map();
       messages?.forEach(message => {
         const partnerId = message.sender_id === user.id ? message.receiver_id : message.sender_id;
         const partner = message.sender_id === user.id ? message.receiver : message.sender;
         
+        // Skip if partner profile is null
+        if (!partner || !partner.full_name) {
+          console.warn('Skipping message with null profile:', message.id);
+          return;
+        }
+        
         if (!conversationMap.has(partnerId)) {
           conversationMap.set(partnerId, {
             id: partnerId,
-            name: partner.full_name,
-            username: partner.username,
-            avatar: partner.avatar_url,
+            name: partner.full_name || 'Unknown User',
+            username: partner.username || 'unknown',
+            avatar: partner.avatar_url || '',
             lastMessage: message.content,
             timestamp: message.created_at,
             unread: !message.is_read && message.receiver_id === user.id
@@ -82,6 +100,7 @@ export default function Messages({ initialChat, onClearUnread, onChatStateChange
       setConversations(Array.from(conversationMap.values()));
     } catch (error) {
       console.error('Error fetching conversations:', error);
+      setConversations([]);
     } finally {
       setLoading(false);
     }

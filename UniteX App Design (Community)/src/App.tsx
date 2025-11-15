@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Toaster } from "./components/ui/sonner";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import LoginScreen from "./components/LoginScreen";
+import { App as CapacitorApp } from '@capacitor/app';
 
 import ProfileOnboarding from "./components/ProfileOnboarding";
 import HomeFeed from "./components/HomeFeed";
@@ -49,7 +50,13 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userEmail, setUserEmail] = useState("");
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const currentScreenRef = useRef<Screen>(currentScreen);
   
+  // Update ref whenever screen changes
+  useEffect(() => {
+    currentScreenRef.current = currentScreen;
+  }, [currentScreen]);
+
   // Check authentication state on app load
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -72,7 +79,58 @@ export default function App() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    // Handle deep links for authentication
+    const handleAppUrlOpen = (event: any) => {
+      const url = event.url;
+      if (url.includes('auth/callback')) {
+        // Extract the URL fragment and handle auth
+        const urlParams = new URLSearchParams(url.split('#')[1] || url.split('?')[1]);
+        const accessToken = urlParams.get('access_token');
+        const refreshToken = urlParams.get('refresh_token');
+        
+        if (accessToken && refreshToken) {
+          supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+          });
+        }
+      }
+    };
+
+    // Listen for app URL opens (deep links)
+    CapacitorApp.addListener('appUrlOpen', handleAppUrlOpen);
+
+    CapacitorApp.addListener('backButton', () => {
+      if (currentScreenRef.current === "home") {
+        // Exit the app when back button is pressed on the home screen
+        CapacitorApp.exitApp();
+      } else {
+        // Navigate back to the previous screen when back button is pressed
+        const screens: { [key: string]: string } = {
+          "onboarding": "login",
+          "home": "login",
+          "project": "home",
+          "communities": "home",
+          "notifications": "home",
+          "profile": "home",
+          "otherProfile": "home",
+          "followers": "profile",
+          "messages": "home",
+          "settings": "home",
+          "bookmarks": "home",
+          "search": "home",
+          "jobs": "home",
+          "lists": "home",
+          "spaces": "home"
+        };
+        setCurrentScreen(screens[currentScreenRef.current] || "home");
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+      CapacitorApp.removeAllListeners();
+    };
   }, []);
 
   const checkUserProfile = async (userId: string) => {
@@ -99,8 +157,8 @@ export default function App() {
       setCurrentScreen("onboarding");
     }
   };
-  const [unreadNotifications, setUnreadNotifications] = useState(3);
-  const [unreadMessages, setUnreadMessages] = useState(2);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const [selectedUsername, setSelectedUsername] = useState("");
   const [selectedProfileName, setSelectedProfileName] = useState("");
   const [followersTab, setFollowersTab] = useState<"followers" | "following">("followers");
@@ -111,6 +169,58 @@ export default function App() {
     avatar: string;
   } | null>(null);
   const [isInChatConversation, setIsInChatConversation] = useState(false);
+
+  // Fetch unread counts
+  useEffect(() => {
+    if (!isLoggedIn || !currentUser?.id) return;
+
+    const fetchUnreadCounts = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Fetch unread messages count
+        const { count: messagesCount } = await supabase
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('receiver_id', user.id)
+          .eq('is_read', false);
+
+        setUnreadMessages(messagesCount || 0);
+
+        // Fetch unread notifications count
+        // Note: Add this once you have a notifications table
+        // For now, keeping at 0
+        // const { count: notificationsCount } = await supabase
+        //   .from('notifications')
+        //   .select('*', { count: 'exact', head: true })
+        //   .eq('user_id', user.id)
+        //   .eq('is_read', false);
+        // setUnreadNotifications(notificationsCount || 0);
+
+      } catch (error) {
+        console.error('Error fetching unread counts:', error);
+      }
+    };
+
+    fetchUnreadCounts();
+
+    // Set up real-time subscription for messages
+    const messagesSubscription = supabase
+      .channel('unread-messages')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'messages',
+      }, () => {
+        fetchUnreadCounts();
+      })
+      .subscribe();
+
+    return () => {
+      messagesSubscription.unsubscribe();
+    };
+  }, [isLoggedIn, currentUser?.id]);
 
   const handleLogin = () => {
     // Login is handled by auth state change
@@ -161,6 +271,7 @@ export default function App() {
       
       if (screen !== "messages") {
         setPreselectedChat(null);
+        setIsInChatConversation(false); // Reset chat state when leaving messages
       }
       setCurrentScreen(screen as Screen);
       localStorage.setItem('currentScreen', screen);

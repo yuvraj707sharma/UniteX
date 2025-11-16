@@ -188,15 +188,61 @@ export default function App() {
 
         setUnreadMessages(messagesCount || 0);
 
-        // Fetch unread notifications count
-        // Note: Add this once you have a notifications table
-        // For now, keeping at 0
-        // const { count: notificationsCount } = await supabase
-        //   .from('notifications')
-        //   .select('*', { count: 'exact', head: true })
-        //   .eq('user_id', user.id)
-        //   .eq('is_read', false);
-        // setUnreadNotifications(notificationsCount || 0);
+        // Fetch unread notifications count (from localStorage + recent database activity)
+        const readIds = getReadNotificationIds();
+        
+        // Count recent follows
+        const { data: follows } = await supabase
+          .from('follows')
+          .select('created_at, follower_id')
+          .eq('following_id', user.id)
+          .gt('created_at', getOneDayAgo());
+
+        let unreadCount = 0;
+        follows?.forEach((follow: any) => {
+          const notifId = `follow-${follow.follower_id}`;
+          if (!readIds.includes(notifId)) {
+            unreadCount++;
+          }
+        });
+
+        // Count recent likes on user's posts
+        const { data: postIds } = await supabase
+          .from('posts')
+          .select('id')
+          .eq('author_id', user.id);
+
+        if (postIds && postIds.length > 0) {
+          const { data: likes } = await supabase
+            .from('post_likes')
+            .select('created_at, post_id, user_id')
+            .in('post_id', postIds.map((p: any) => p.id))
+            .neq('user_id', user.id)
+            .gt('created_at', getOneDayAgo());
+
+          likes?.forEach((like: any) => {
+            const notifId = `like-${like.post_id}-${like.user_id}`;
+            if (!readIds.includes(notifId)) {
+              unreadCount++;
+            }
+          });
+
+          const { data: comments } = await supabase
+            .from('comments')
+            .select('created_at, post_id, author_id')
+            .in('post_id', postIds.map((p: any) => p.id))
+            .neq('author_id', user.id)
+            .gt('created_at', getOneDayAgo());
+
+          comments?.forEach((comment: any) => {
+            const notifId = `comment-${comment.post_id}-${comment.author_id}`;
+            if (!readIds.includes(notifId)) {
+              unreadCount++;
+            }
+          });
+        }
+
+        setUnreadNotifications(unreadCount);
 
       } catch (error) {
         console.error('Error fetching unread counts:', error);
@@ -217,10 +263,62 @@ export default function App() {
       })
       .subscribe();
 
+    // Set up real-time subscriptions for notifications
+    const followsSubscription = supabase
+      .channel('follows-changes')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'follows',
+      }, () => {
+        fetchUnreadCounts();
+      })
+      .subscribe();
+
+    const likesSubscription = supabase
+      .channel('likes-changes')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'post_likes',
+      }, () => {
+        fetchUnreadCounts();
+      })
+      .subscribe();
+
+    const commentsSubscription = supabase
+      .channel('comments-changes')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'comments',
+      }, () => {
+        fetchUnreadCounts();
+      })
+      .subscribe();
+
     return () => {
       messagesSubscription.unsubscribe();
+      followsSubscription.unsubscribe();
+      likesSubscription.unsubscribe();
+      commentsSubscription.unsubscribe();
     };
   }, [isLoggedIn, currentUser?.id]);
+
+  const getReadNotificationIds = () => {
+    try {
+      const saved = localStorage.getItem('readNotifications');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const getOneDayAgo = () => {
+    const date = new Date();
+    date.setDate(date.getDate() - 1);
+    return date.toISOString();
+  };
 
   const handleLogin = () => {
     // Login is handled by auth state change
@@ -369,10 +467,6 @@ export default function App() {
       case "communities":
         return <Communities />;
       case "notifications":
-        // Clear notifications when viewing
-        if (unreadNotifications > 0) {
-          setTimeout(() => setUnreadNotifications(0), 1000);
-        }
         return <Notifications onNavigateToProfile={handleNavigateToOtherProfile} />;
       case "profile":
         return <Profile 
@@ -399,10 +493,6 @@ export default function App() {
           />
         );
       case "messages":
-        // Clear message notifications when viewing
-        if (unreadMessages > 0) {
-          setTimeout(() => setUnreadMessages(0), 1000);
-        }
         return <Messages 
           initialChat={preselectedChat} 
           onClearUnread={() => setUnreadMessages(0)}

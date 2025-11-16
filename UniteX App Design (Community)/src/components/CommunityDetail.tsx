@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Users, Bell, BellOff, MoreVertical, Search } from "lucide-react";
+import { ArrowLeft, Users, Bell, BellOff, MoreVertical, Search, Plus } from "lucide-react";
 import { Button } from "./ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import PostCard from "./PostCard";
+import CreatePost from "./CreatePost";
 import { supabase } from "../lib/supabase";
 
 interface CommunityDetailProps {
@@ -28,11 +29,38 @@ export default function CommunityDetail({ community, onBack, onToggleJoin }: Com
   const [members, setMembers] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCreatePost, setShowCreatePost] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
+    fetchCurrentUser();
     fetchMembers();
     fetchPosts();
   }, [community.id]);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (profile) {
+        setCurrentUser({
+          id: profile.id,
+          name: profile.full_name,
+          username: profile.username,
+          avatar: profile.avatar_url
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching current user:', error);
+    }
+  };
 
   const fetchMembers = async () => {
     try {
@@ -72,11 +100,52 @@ export default function CommunityDetail({ community, onBack, onToggleJoin }: Com
 
   const fetchPosts = async () => {
     try {
-      // For now, posts don't have community_id field
-      // This will be implemented when community posts feature is added
-      setPosts([]);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('posts')
+        .select(`
+          *,
+          profiles:author_id (
+            id,
+            full_name,
+            username,
+            avatar_url,
+            department
+          )
+        `)
+        .eq('community_id', community.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const formattedPosts = data?.map(post => ({
+        id: post.id,
+        author: post.profiles?.full_name || 'Unknown User',
+        username: post.profiles?.username || 'unknown',
+        authorId: post.author_id,
+        time: new Date(post.created_at).toLocaleString(),
+        content: post.content,
+        avatar: post.profiles?.avatar_url || '',
+        likes: post.likes_count || 0,
+        comments: post.comments_count || 0,
+        reposts: 0,
+        bookmarks: 0,
+        media: post.media_urls?.[0] || null,
+        mediaType: post.media_types?.[0] || null,
+        department: post.profiles?.department || '',
+        initialLiked: false, // Will be checked
+        initialComments: [],
+        initialReposts: []
+      })) || [];
+
+      setPosts(formattedPosts);
     } catch (error) {
       console.error('Error fetching posts:', error);
+      toast.error('Failed to load community posts');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -184,16 +253,17 @@ export default function CommunityDetail({ community, onBack, onToggleJoin }: Com
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
           >
-            {posts.length === 0 ? (
+            {loading ? (
+              <div className="flex items-center justify-center h-96">
+                <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full"></div>
+              </div>
+            ) : posts.length === 0 ? (
               <div className="flex items-center justify-center h-96">
                 <div className="text-center space-y-4">
                   <div className="text-6xl mb-4">📝</div>
                   <h2 className="text-foreground text-xl">No posts yet</h2>
                   <p className="text-muted-foreground max-w-sm">
-                    Be the first to post in this community!
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    (Community posts feature coming soon)
+                    {community.joined ? "Be the first to post in this community!" : "Join the community to see posts!"}
                   </p>
                 </div>
               </div>
@@ -208,7 +278,7 @@ export default function CommunityDetail({ community, onBack, onToggleJoin }: Com
                 })
                 .map((post, index) => (
                   <motion.div
-                    key={index}
+                    key={post.id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.1 }}
@@ -280,6 +350,32 @@ export default function CommunityDetail({ community, onBack, onToggleJoin }: Com
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Floating Action Button for Create Post - Only show if joined and on posts tab */}
+      {community.joined && activeTab === "posts" && (
+        <motion.button
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          onClick={() => setShowCreatePost(true)}
+          className="fixed bottom-24 right-6 w-14 h-14 dark:bg-blue-500 light:bg-red-600 text-white rounded-full shadow-lg flex items-center justify-center hover:scale-110 transition-transform z-40"
+        >
+          <Plus className="w-6 h-6" />
+        </motion.button>
+      )}
+
+      {/* Create Post Modal */}
+      {showCreatePost && currentUser && (
+        <CreatePost
+          onClose={() => setShowCreatePost(false)}
+          onPostCreated={() => {
+            fetchPosts();
+            setShowCreatePost(false);
+          }}
+          currentUser={currentUser}
+          communityId={community.id}
+          communityName={community.name}
+        />
+      )}
     </div>
   );
 }

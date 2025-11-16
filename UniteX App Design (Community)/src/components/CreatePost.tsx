@@ -9,9 +9,11 @@ interface CreatePostProps {
   onClose: () => void;
   onPostCreated: () => void;
   currentUser: any;
+  communityId?: string; // Optional - for community posts
+  communityName?: string; // Optional - to show which community
 }
 
-export default function CreatePost({ onClose, onPostCreated, currentUser }: CreatePostProps) {
+export default function CreatePost({ onClose, onPostCreated, currentUser, communityId, communityName }: CreatePostProps) {
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<File[]>([]);
@@ -99,12 +101,13 @@ export default function CreatePost({ onClose, onPostCreated, currentUser }: Crea
           post_type: 'idea',
           media_urls: mediaUrls.length > 0 ? mediaUrls : null,
           media_types: mediaTypes.length > 0 ? mediaTypes : null,
-          is_approved: true // Auto-approve for now
+          is_approved: true, // Auto-approve for now
+          community_id: communityId || null // Add community_id if posting to community
         });
 
       if (error) throw error;
 
-      toast.success("Post created successfully!");
+      toast.success(communityId ? "Post created in community!" : "Post created successfully!");
       onPostCreated();
       onClose();
     } catch (error) {
@@ -123,7 +126,9 @@ export default function CreatePost({ onClose, onPostCreated, currentUser }: Crea
           <button onClick={onClose}>
             <X className="w-6 h-6 text-muted-foreground" />
           </button>
-          <h2 className="text-lg font-semibold">Create Post</h2>
+          <h2 className="text-lg font-semibold">
+            {communityName ? `Post in ${communityName}` : 'Create Post'}
+          </h2>
           <Button 
             onClick={handleSubmit}
             disabled={!content.trim() || loading}

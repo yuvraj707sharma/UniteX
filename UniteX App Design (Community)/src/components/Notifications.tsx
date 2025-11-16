@@ -1,16 +1,11 @@
-import { useState } from "react";
-import { Heart, MessageCircle, Users, AtSign } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Heart, MessageCircle, Users, AtSign, UserPlus } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-
-const initialNotifications = {
-  all: [],
-  collaborations: [],
-  mentions: [],
-};
+import { supabase } from "../lib/supabase";
 
 const getNotificationIcon = (type: string) => {
   switch (type) {
@@ -18,6 +13,8 @@ const getNotificationIcon = (type: string) => {
       return <Heart className="w-8 h-8 text-pink-500 fill-current" />;
     case "comment":
       return <MessageCircle className="w-8 h-8 text-blue-500" />;
+    case "follow":
+      return <UserPlus className="w-8 h-8 text-green-500" />;
     case "collaboration":
       return <Users className="w-8 h-8 text-green-500" />;
     case "mention":
@@ -31,7 +28,7 @@ interface NotificationItemProps {
   notification: any;
   onAccept?: (id: number) => void;
   onDecline?: (id: number) => void;
-  onMarkAsRead?: (id: number) => void;
+  onMarkAsRead?: (id: string) => void;
   onNavigateToPost?: (username: string) => void;
 }
 
@@ -43,7 +40,7 @@ function NotificationItem({ notification, onAccept, onDecline, onMarkAsRead, onN
       }
       
       // Navigate to relevant content
-      if (notification.type === "like" || notification.type === "comment" || notification.type === "mention") {
+      if (notification.type === "like" || notification.type === "comment" || notification.type === "mention" || notification.type === "follow") {
         try {
           onNavigateToPost?.(notification.username);
         } catch (navError) {
@@ -122,7 +119,159 @@ interface NotificationsProps {
 }
 
 export default function Notifications({ onNavigateToProfile }: NotificationsProps = {}) {
-  // Load read notifications from localStorage
+  const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState<any>({
+    all: [],
+    collaborations: [],
+    mentions: [],
+  });
+
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  const fetchNotifications = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      const allNotifications: any[] = [];
+
+      // Fetch follow notifications
+      const { data: follows } = await supabase
+        .from('follows')
+        .select(`
+          created_at,
+          follower:follower_id(id, full_name, username, avatar_url)
+        `)
+        .eq('following_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      follows?.forEach((follow: any) => {
+        if (follow.follower) {
+          allNotifications.push({
+            id: `follow-${follow.follower.id}`,
+            type: 'follow',
+            user: follow.follower.full_name || 'Unknown User',
+            username: follow.follower.username || 'unknown',
+            avatar: follow.follower.avatar_url || '',
+            content: 'started following you',
+            time: formatTimeAgo(follow.created_at),
+            timestamp: follow.created_at,
+            read: false,
+          });
+        }
+      });
+
+      // Fetch like notifications
+      const { data: postIds } = await supabase
+        .from('posts')
+        .select('id')
+        .eq('author_id', user.id);
+
+      if (postIds && postIds.length > 0) {
+        const { data: likes } = await supabase
+          .from('post_likes')
+          .select(`
+            created_at,
+            post_id,
+            liker:user_id(id, full_name, username, avatar_url)
+          `)
+          .in('post_id', postIds.map(p => p.id))
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        likes?.forEach((like: any) => {
+          if (like.liker && like.liker.id !== user.id) {
+            allNotifications.push({
+              id: `like-${like.post_id}-${like.liker.id}`,
+              type: 'like',
+              user: like.liker.full_name || 'Unknown User',
+              username: like.liker.username || 'unknown',
+              avatar: like.liker.avatar_url || '',
+              content: 'liked your post',
+              time: formatTimeAgo(like.created_at),
+              timestamp: like.created_at,
+              read: false,
+            });
+          }
+        });
+
+        // Fetch comment notifications
+        const { data: comments } = await supabase
+          .from('comments')
+          .select(`
+            created_at,
+            post_id,
+            content,
+            commenter:author_id(id, full_name, username, avatar_url)
+          `)
+          .in('post_id', postIds.map(p => p.id))
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        comments?.forEach((comment: any) => {
+          if (comment.commenter && comment.commenter.id !== user.id) {
+            allNotifications.push({
+              id: `comment-${comment.post_id}-${comment.commenter.id}`,
+              type: 'comment',
+              user: comment.commenter.full_name || 'Unknown User',
+              username: comment.commenter.username || 'unknown',
+              avatar: comment.commenter.avatar_url || '',
+              content: 'commented on your post',
+              time: formatTimeAgo(comment.created_at),
+              timestamp: comment.created_at,
+              read: false,
+            });
+          }
+        });
+      }
+
+      // Sort all notifications by timestamp
+      allNotifications.sort((a, b) => 
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      );
+
+      // Get read notifications from localStorage
+      const readIds = getReadNotifications();
+      const notificationsWithReadStatus = allNotifications.map(n => ({
+        ...n,
+        read: readIds.includes(n.id)
+      }));
+
+      setNotifications({
+        all: notificationsWithReadStatus,
+        collaborations: [],
+        mentions: [],
+      });
+
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      toast.error('Failed to load notifications');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInMs = now.getTime() - date.getTime();
+    const diffInMins = Math.floor(diffInMs / (1000 * 60));
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+    if (diffInMins < 1) return 'just now';
+    if (diffInMins < 60) return `${diffInMins}m ago`;
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    if (diffInDays < 7) return `${diffInDays}d ago`;
+    return date.toLocaleDateString();
+  };
+
   const getReadNotifications = () => {
     try {
       const saved = localStorage.getItem('readNotifications');
@@ -132,26 +281,33 @@ export default function Notifications({ onNavigateToProfile }: NotificationsProp
     }
   };
 
-  const [readNotificationIds, setReadNotificationIds] = useState<number[]>(getReadNotifications());
-  
-  // Mark notifications as read based on localStorage
-  const [notifications, setNotifications] = useState(() => {
-    const readIds = getReadNotifications();
-    return {
-      all: initialNotifications.all.map(n => ({ ...n, read: readIds.includes(n.id) || n.read })),
-      collaborations: initialNotifications.collaborations.map(n => ({ ...n, read: readIds.includes(n.id) || n.read })),
-      mentions: initialNotifications.mentions.map(n => ({ ...n, read: readIds.includes(n.id) || n.read })),
-    };
-  });
+  const handleMarkAsRead = (id: string) => {
+    try {
+      const readIds = getReadNotifications();
+      const newReadIds = [...readIds, id];
+      localStorage.setItem('readNotifications', JSON.stringify(newReadIds));
+      
+      setNotifications((prev: any) => ({
+        ...prev,
+        all: prev.all.map((n: any) => (n.id === id ? { ...n, read: true } : n)),
+        collaborations: prev.collaborations.map((n: any) =>
+          n.id === id ? { ...n, read: true } : n
+        ),
+        mentions: prev.mentions.map((n: any) => (n.id === id ? { ...n, read: true } : n)),
+      }));
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
 
   const handleAccept = (id: number) => {
     toast.success("Collaboration request accepted!");
-    setNotifications((prev) => ({
+    setNotifications((prev: any) => ({
       ...prev,
-      all: prev.all.map((n) =>
+      all: prev.all.map((n: any) =>
         n.id === id ? { ...n, actionable: false, read: true } : n
       ),
-      collaborations: prev.collaborations.map((n) =>
+      collaborations: prev.collaborations.map((n: any) =>
         n.id === id ? { ...n, actionable: false, read: true } : n
       ),
     }));
@@ -159,29 +315,14 @@ export default function Notifications({ onNavigateToProfile }: NotificationsProp
 
   const handleDecline = (id: number) => {
     toast.info("Collaboration request declined");
-    setNotifications((prev) => ({
+    setNotifications((prev: any) => ({
       ...prev,
-      all: prev.all.map((n) =>
+      all: prev.all.map((n: any) =>
         n.id === id ? { ...n, actionable: false, read: true } : n
       ),
-      collaborations: prev.collaborations.map((n) =>
+      collaborations: prev.collaborations.map((n: any) =>
         n.id === id ? { ...n, actionable: false, read: true } : n
       ),
-    }));
-  };
-
-  const handleMarkAsRead = (id: number) => {
-    const newReadIds = [...readNotificationIds, id];
-    setReadNotificationIds(newReadIds);
-    localStorage.setItem('readNotifications', JSON.stringify(newReadIds));
-    
-    setNotifications((prev) => ({
-      ...prev,
-      all: prev.all.map((n) => (n.id === id ? { ...n, read: true } : n)),
-      collaborations: prev.collaborations.map((n) =>
-        n.id === id ? { ...n, read: true } : n
-      ),
-      mentions: prev.mentions.map((n) => (n.id === id ? { ...n, read: true } : n)),
     }));
   };
 
@@ -217,36 +358,45 @@ export default function Notifications({ onNavigateToProfile }: NotificationsProp
           </TabsList>
 
           <TabsContent value="all" className="m-0">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3 }}
-            >
-              {notifications.all.length > 0 ? notifications.all.map((notification, index) => (
-                <motion.div
-                  key={notification.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                >
-                  <NotificationItem 
-                    notification={notification}
-                    onAccept={handleAccept}
-                    onDecline={handleDecline}
-                    onMarkAsRead={handleMarkAsRead}
-                    onNavigateToPost={onNavigateToProfile}
-                  />
-                </motion.div>
-              )) : (
-                <div className="flex items-center justify-center h-96">
-                  <div className="text-center space-y-4">
-                    <div className="text-4xl mb-4">🔔</div>
-                    <p className="text-muted-foreground">No notifications yet</p>
-                    <p className="text-sm text-muted-foreground">You'll see notifications here when people interact with your posts</p>
-                  </div>
+            {loading ? (
+              <div className="flex items-center justify-center h-96">
+                <div className="text-center space-y-4">
+                  <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
+                  <p className="text-muted-foreground">Loading notifications...</p>
                 </div>
-              )}
-            </motion.div>
+              </div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+              >
+                {notifications.all.length > 0 ? notifications.all.map((notification: any, index: number) => (
+                  <motion.div
+                    key={notification.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                  >
+                    <NotificationItem 
+                      notification={notification}
+                      onAccept={handleAccept}
+                      onDecline={handleDecline}
+                      onMarkAsRead={handleMarkAsRead}
+                      onNavigateToPost={onNavigateToProfile}
+                    />
+                  </motion.div>
+                )) : (
+                  <div className="flex items-center justify-center h-96">
+                    <div className="text-center space-y-4">
+                      <div className="text-4xl mb-4">🔔</div>
+                      <p className="text-muted-foreground">No notifications yet</p>
+                      <p className="text-sm text-muted-foreground">You'll see notifications here when people interact with your posts</p>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            )}
           </TabsContent>
 
           <TabsContent value="collaborations" className="m-0">
@@ -255,7 +405,7 @@ export default function Notifications({ onNavigateToProfile }: NotificationsProp
               animate={{ opacity: 1 }}
               transition={{ duration: 0.3 }}
             >
-              {notifications.collaborations.length > 0 ? notifications.collaborations.map((notification, index) => (
+              {notifications.collaborations.length > 0 ? notifications.collaborations.map((notification: any, index: number) => (
                 <motion.div
                   key={notification.id}
                   initial={{ opacity: 0, x: -20 }}
@@ -288,7 +438,7 @@ export default function Notifications({ onNavigateToProfile }: NotificationsProp
               animate={{ opacity: 1 }}
               transition={{ duration: 0.3 }}
             >
-              {notifications.mentions.length > 0 ? notifications.mentions.map((notification, index) => (
+              {notifications.mentions.length > 0 ? notifications.mentions.map((notification: any, index: number) => (
                 <motion.div
                   key={notification.id}
                   initial={{ opacity: 0, x: -20 }}

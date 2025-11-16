@@ -72,13 +72,34 @@ export default function PostCard({
     fetchLikeStatus();
     fetchBookmarkStatus();
     fetchActualLikeCount();
+    fetchActualCommentCount(); // Add comment count fetch
   }, []);
-
+  
   useEffect(() => {
     if (showCommentDialog) {
       fetchComments();
     }
   }, [showCommentDialog]);
+
+  const fetchActualCommentCount = async () => {
+    try {
+      if (!id) return;
+      
+      const { count, error } = await supabase
+        .from('comments')
+        .select('*', { count: 'exact', head: true })
+        .eq('post_id', id);
+      
+      if (error) {
+        console.error('Error fetching comment count:', error);
+        return;
+      }
+      
+      setComments(count || 0);
+    } catch (error) {
+      console.error('Error in fetchActualCommentCount:', error);
+    }
+  };
 
   const fetchCurrentUser = async () => {
     try {
@@ -246,6 +267,10 @@ export default function PostCard({
   };
 
   const handleLike = async () => {
+    // Store original state before any changes
+    const wasLiked = liked;
+    const originalLikes = likes;
+    
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -253,7 +278,12 @@ export default function PostCard({
         return;
       }
 
-      if (liked) {
+      // Optimistic update - change UI immediately
+      setLiked(!wasLiked);
+      setLikes(wasLiked ? originalLikes - 1 : originalLikes + 1);
+
+      if (wasLiked) {
+        // Unlike
         const { error } = await supabase
           .from('post_likes')
           .delete()
@@ -261,25 +291,29 @@ export default function PostCard({
           .eq('user_id', user.id);
         
         if (error) {
-          console.error('Error deleting like:', error);
+          // Check for specific error types
+          if (error.code === 'PGRST116') {
+            // No rows found - already unliked
+            console.log('Already unliked');
+            toast.info('Already unliked');
+            return; // Don't revert - state is correct
+          }
           throw error;
         }
         
-        setLiked(false);
-        const newLikeCount = Math.max(0, likes - 1);
-        setLikes(newLikeCount);
         toast.success("Unliked!");
         
         // Update the post's like count in database
         const { error: updateError } = await supabase
           .from('posts')
-          .update({ likes_count: newLikeCount })
+          .update({ likes_count: originalLikes - 1 })
           .eq('id', id);
         
         if (updateError) {
           console.error('Error updating likes_count:', updateError);
         }
       } else {
+        // Like
         const { error } = await supabase
           .from('post_likes')
           .insert({
@@ -288,6 +322,13 @@ export default function PostCard({
           });
         
         if (error) {
+          // Check for specific error types
+          if (error.code === '23505') {
+            // Duplicate key - already liked
+            console.log('Already liked');
+            toast.info('Already liked!');
+            return; // Don't revert - state is correct
+          }
           console.error('Error inserting like:', error);
           console.error('Error details:', {
             message: error.message,
@@ -298,24 +339,29 @@ export default function PostCard({
           throw error;
         }
         
-        setLiked(true);
-        setLikes(likes + 1);
         toast.success("Liked!");
         
         // Update the post's like count in database
         const { error: updateError } = await supabase
           .from('posts')
-          .update({ likes_count: likes + 1 })
+          .update({ likes_count: originalLikes + 1 })
           .eq('id', id);
         
         if (updateError) {
           console.error('Error updating likes_count:', updateError);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error liking post:', error);
       console.error('Full error object:', JSON.stringify(error, null, 2));
-      toast.error('Failed to like post');
+      
+      // Provide specific error message
+      const errorMessage = error?.message || 'Unknown error occurred';
+      toast.error(`Failed to ${wasLiked ? 'unlike' : 'like'} post: ${errorMessage}`);
+      
+      // Revert optimistic update using the original state
+      setLiked(wasLiked);
+      setLikes(originalLikes);
     }
   };
 

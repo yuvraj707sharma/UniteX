@@ -16,139 +16,6 @@ interface JobsProps {
 }
 
 export default function Jobs({ onBack }: JobsProps) {
-  const [jobs, setJobs] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showPostJob, setShowPostJob] = useState(false);
-  const [showApplyDialog, setShowApplyDialog] = useState(false);
-  const [selectedJob, setSelectedJob] = useState<any>(null);
-  const [resumeFile, setResumeFile] = useState<File | null>(null);
-  const [coverNote, setCoverNote] = useState("");
-  const [jobForm, setJobForm] = useState({
-    title: "",
-    company: "",
-    location: "",
-    type: "internship" as "internship" | "part-time" | "full-time" | "project",
-    salary: "",
-    description: "",
-    requirements: ""
-  });
-
-  useEffect(() => {
-    fetchJobs();
-  }, []);
-
-  const fetchJobs = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('jobs')
-        .select('*, profiles(full_name, username)')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      setJobs(data || []);
-    } catch (error) {
-      console.error('Error fetching jobs:', error);
-      setJobs([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePostJob = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error('Please log in to post a job');
-        return;
-      }
-
-      const { error } = await supabase
-        .from('jobs')
-        .insert({
-          user_id: user.id,
-          title: jobForm.title,
-          company: jobForm.company,
-          location: jobForm.location,
-          type: jobForm.type,
-          salary: jobForm.salary || null,
-          description: jobForm.description,
-          requirements: jobForm.requirements || null
-        });
-
-      if (error) throw error;
-
-      toast.success('Job posted successfully!');
-      setShowPostJob(false);
-      setJobForm({
-        title: "",
-        company: "",
-        location: "",
-        type: "internship",
-        salary: "",
-        description: "",
-        requirements: ""
-      });
-      fetchJobs();
-    } catch (error) {
-      console.error('Error posting job:', error);
-      toast.error('Failed to post job');
-    }
-  };
-
-  const handleApplyClick = (job: any) => {
-    setSelectedJob(job);
-    setShowApplyDialog(true);
-  };
-
-  const handleApply = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error('Please log in to apply');
-        return;
-      }
-
-      if (!resumeFile) {
-        toast.error('Please upload your resume');
-        return;
-      }
-
-      // Upload resume file
-      const fileExt = resumeFile.name.split('.').pop();
-      const fileName = `${user.id}/${selectedJob.id}.${fileExt}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('resumes')
-        .upload(fileName, resumeFile);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('resumes')
-        .getPublicUrl(fileName);
-
-      // Create application
-      const { error } = await supabase
-        .from('job_applications')
-        .insert({
-          job_id: selectedJob.id,
-          user_id: user.id,
-          resume_url: publicUrl,
-          cover_note: coverNote
-        });
-
-      if (error) throw error;
-
-      toast.success('Application submitted successfully!');
-      setShowApplyDialog(false);
-      setResumeFile(null);
-      setCoverNote("");
-    } catch (error) {
-      console.error('Error applying:', error);
-      toast.error('Failed to submit application');
-    }
-  };
-
   return (
     <div className="min-h-screen bg-background pb-20 max-w-md mx-auto">
       {/* Header */}
@@ -159,242 +26,139 @@ export default function Jobs({ onBack }: JobsProps) {
           </button>
           <div className="flex-1">
             <h1 className="text-foreground text-xl">Jobs</h1>
-            <p className="text-muted-foreground text-sm">{jobs.length} opportunities</p>
+            <p className="text-muted-foreground text-sm">Coming Soon</p>
           </div>
-          <button 
-            onClick={() => setShowPostJob(true)}
-            className="p-2 dark:bg-blue-500 light:bg-red-600 text-white rounded-full"
-          >
-            <Plus className="w-5 h-5" />
-          </button>
         </div>
       </div>
 
-      {/* Jobs List */}
+      {/* Coming Soon Content */}
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.3 }}
-        className="p-4 space-y-3"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="flex flex-col items-center justify-center min-h-[80vh] px-6"
       >
-        {jobs.map((job, index) => (
+        {/* Animated Icon */}
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ 
+            type: "spring",
+            stiffness: 200,
+            damping: 15,
+            delay: 0.2
+          }}
+          className="relative mb-8"
+        >
+          <div className="w-32 h-32 rounded-full dark:bg-gradient-to-br dark:from-blue-500/20 dark:to-purple-500/20 light:bg-gradient-to-br light:from-red-100 light:to-orange-100 flex items-center justify-center">
+            <Briefcase className="w-16 h-16 dark:text-blue-500 light:text-red-600" />
+          </div>
+          
+          {/* Sparkle effects */}
           <motion.div
-            key={job.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            className="dark:bg-zinc-900 light:bg-gray-50 rounded-2xl p-4 border dark:border-zinc-800 light:border-gray-200"
+            animate={{ 
+              rotate: 360,
+              scale: [1, 1.2, 1]
+            }}
+            transition={{ 
+              duration: 3,
+              repeat: Infinity,
+              ease: "linear"
+            }}
+            className="absolute -top-2 -right-2"
           >
-            <div className="space-y-3">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <h3 className="text-foreground mb-1">{job.title}</h3>
-                  <p className="text-muted-foreground text-sm">{job.company}</p>
-                </div>
-                <Badge className="dark:bg-blue-500/10 light:bg-red-50 dark:text-blue-400 light:text-red-600 dark:border-blue-500/20 light:border-red-200">
-                  {job.type}
-                </Badge>
-              </div>
-
-              <p className="text-muted-foreground text-sm">{job.description}</p>
-
-              <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  <MapPin className="w-4 h-4" />
-                  <span>{job.location}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <DollarSign className="w-4 h-4" />
-                  <span>{job.salary}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Clock className="w-4 h-4" />
-                  <span>{job.posted}</span>
-                </div>
-              </div>
-
-              <Button
-                onClick={() => handleApplyClick(job)}
-                className="w-full dark:bg-blue-500 dark:hover:bg-blue-600 light:bg-red-600 light:hover:bg-red-700 text-white rounded-full"
-              >
-                Apply Now
-              </Button>
-            </div>
+            <Briefcase className="w-6 h-6 dark:text-blue-400 light:text-red-500" />
           </motion.div>
-        ))}
-      </motion.div>
+          
+          <motion.div
+            animate={{ 
+              rotate: -360,
+              scale: [1, 1.3, 1]
+            }}
+            transition={{ 
+              duration: 4,
+              repeat: Infinity,
+              ease: "linear",
+              delay: 1
+            }}
+            className="absolute -bottom-2 -left-2"
+          >
+            <Briefcase className="w-5 h-5 dark:text-purple-400 light:text-orange-500" />
+          </motion.div>
+        </motion.div>
 
-      {/* Loading State */}
-      {loading && (
-        <div className="flex items-center justify-center h-96">
-          <div className="text-center space-y-4">
-            <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
-            <p className="text-muted-foreground">Loading jobs...</p>
-          </div>
-        </div>
-      )}
+        {/* Title */}
+        <motion.h2
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="text-3xl font-bold text-foreground mb-4 text-center"
+        >
+          Jobs Coming Soon!
+        </motion.h2>
 
-      {/* Empty State */}
-      {!loading && jobs.length === 0 && (
-        <div className="flex items-center justify-center h-96">
-          <div className="text-center space-y-4">
-            <div className="text-6xl mb-4">💼</div>
-            <h2 className="text-foreground text-xl">No jobs available</h2>
-            <p className="text-muted-foreground max-w-sm">
-              Be the first to post a job opportunity!
-            </p>
-            <Button onClick={() => setShowPostJob(true)} className="mt-4">
-              Post a Job
-            </Button>
-          </div>
-        </div>
-      )}
+        {/* Description */}
+        <motion.p
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="text-muted-foreground text-center max-w-md mb-8 leading-relaxed"
+        >
+          We're building an amazing job board where you can find internships, 
+          part-time opportunities, and full-time positions tailored for students 
+          and young professionals.
+        </motion.p>
 
-      {/* Post Job Dialog */}
-      <Dialog open={showPostJob} onOpenChange={setShowPostJob}>
-        <DialogContent className="dark:bg-zinc-900 dark:border-zinc-800 light:bg-white light:border-gray-200 max-w-md max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">Post a Job</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Share an opportunity with the community
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <Input
-              placeholder="Job Title"
-              value={jobForm.title}
-              onChange={(e) => setJobForm({...jobForm, title: e.target.value})}
-            />
-            <Input
-              placeholder="Company Name"
-              value={jobForm.company}
-              onChange={(e) => setJobForm({...jobForm, company: e.target.value})}
-            />
-            <Input
-              placeholder="Location"
-              value={jobForm.location}
-              onChange={(e) => setJobForm({...jobForm, location: e.target.value})}
-            />
-            <select
-              value={jobForm.type}
-              onChange={(e) => setJobForm({...jobForm, type: e.target.value as any})}
-              className="w-full h-10 px-3 rounded-md border dark:bg-zinc-800 dark:border-zinc-700 light:bg-white light:border-gray-300 text-foreground"
+        {/* Features Preview */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          className="w-full max-w-md space-y-3 mb-8"
+        >
+          {[
+            { icon: "💼", text: "Browse internships & job opportunities" },
+            { icon: "📝", text: "Easy one-click applications" },
+            { icon: "🎯", text: "Personalized job recommendations" },
+            { icon: "⚡", text: "Direct connection with recruiters" }
+          ].map((feature, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.7 + index * 0.1 }}
+              className="flex items-center gap-3 p-3 rounded-xl dark:bg-zinc-900/50 light:bg-gray-50 border dark:border-zinc-800 light:border-gray-200"
             >
-              <option value="internship">Internship</option>
-              <option value="part-time">Part-time</option>
-              <option value="full-time">Full-time</option>
-              <option value="project">Project</option>
-            </select>
-            <Input
-              placeholder="Salary (optional)"
-              value={jobForm.salary}
-              onChange={(e) => setJobForm({...jobForm, salary: e.target.value})}
-            />
-            <Textarea
-              placeholder="Job Description"
-              value={jobForm.description}
-              onChange={(e) => setJobForm({...jobForm, description: e.target.value})}
-              className="min-h-[100px]"
-            />
-            <Textarea
-              placeholder="Requirements (optional)"
-              value={jobForm.requirements}
-              onChange={(e) => setJobForm({...jobForm, requirements: e.target.value})}
-              className="min-h-[80px]"
-            />
-            
-            <div className="flex gap-2">
-              <Button
-                onClick={() => setShowPostJob(false)}
-                variant="outline"
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handlePostJob}
-                disabled={!jobForm.title || !jobForm.company || !jobForm.description}
-                className="flex-1 dark:bg-blue-500 dark:hover:bg-blue-600 light:bg-red-600 light:hover:bg-red-700 text-white"
-              >
-                Post Job
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+              <span className="text-2xl">{feature.icon}</span>
+              <span className="text-sm text-foreground">{feature.text}</span>
+            </motion.div>
+          ))}
+        </motion.div>
 
-      {/* Apply Dialog */}
-      <Dialog open={showApplyDialog} onOpenChange={setShowApplyDialog}>
-        <DialogContent className="dark:bg-zinc-900 dark:border-zinc-800 light:bg-white light:border-gray-200 max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">Apply for {selectedJob?.title}</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Submit your application
-            </DialogDescription>
-          </DialogHeader>
+        {/* CTA Button */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 1.1 }}
+        >
+          <Button
+            onClick={onBack}
+            className="dark:bg-blue-500 dark:hover:bg-blue-600 light:bg-red-600 light:hover:bg-red-700 text-white rounded-full px-8 py-6 text-base"
+          >
+            Notify Me When Ready
+          </Button>
+        </motion.div>
 
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm text-muted-foreground mb-2 block">Resume *</label>
-              <input
-                type="file"
-                accept=".pdf,.doc,.docx"
-                onChange={(e) => {
-                  try {
-                    const files = e.target.files;
-                    if (!files || files.length === 0) {
-                      setResumeFile(null);
-                      return;
-                    }
-                    
-                    const file = files[0];
-                    if (file.size > 10 * 1024 * 1024) {
-                      toast.error('File size must be less than 10MB');
-                      e.target.value = '';
-                      return;
-                    }
-                    
-                    setResumeFile(file);
-                  } catch (error) {
-                    console.error('Error handling file selection:', error);
-                    toast.error('Failed to select file');
-                    setResumeFile(null);
-                  }
-                }}
-                className="w-full p-2 border rounded-md dark:bg-zinc-800 dark:border-zinc-700 light:bg-white light:border-gray-300 text-foreground"
-              />
-            </div>
-            
-            <div>
-              <label className="text-sm text-muted-foreground mb-2 block">Cover Note</label>
-              <Textarea
-                placeholder="Why are you interested in this position?"
-                value={coverNote}
-                onChange={(e) => setCoverNote(e.target.value)}
-                className="min-h-[100px]"
-              />
-            </div>
-            
-            <div className="flex gap-2">
-              <Button
-                onClick={() => setShowApplyDialog(false)}
-                variant="outline"
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleApply}
-                disabled={!resumeFile}
-                className="flex-1 dark:bg-blue-500 dark:hover:bg-blue-600 light:bg-red-600 light:hover:bg-red-700 text-white"
-              >
-                Submit Application
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+        {/* Footer Note */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.3 }}
+          className="text-xs text-muted-foreground mt-8"
+        >
+          Expected launch: Coming very soon 
+        </motion.p>
+      </motion.div>
     </div>
   );
 }

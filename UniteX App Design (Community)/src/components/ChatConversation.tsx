@@ -42,6 +42,7 @@ export default function ChatConversation({ onBack, user, onClearUnread }: ChatCo
     const initializeChat = async () => {
       try {
         await fetchMessages();
+        await markMessagesAsRead(); // Mark messages as read
         try {
           onClearUnread?.();
         } catch (clearError) {
@@ -55,6 +56,36 @@ export default function ChatConversation({ onBack, user, onClearUnread }: ChatCo
     
     initializeChat();
   }, [user.id]);
+
+  const markMessagesAsRead = async () => {
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) return;
+
+      // Get the sender's profile ID
+      const { data: senderProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', user.username)
+        .single();
+
+      if (!senderProfile) return;
+
+      // Mark all unread messages from this sender as read
+      const { error } = await supabase
+        .from('messages')
+        .update({ is_read: true })
+        .eq('sender_id', senderProfile.id)
+        .eq('receiver_id', currentUser.id)
+        .eq('is_read', false);
+
+      if (error) {
+        console.error('Error marking messages as read:', error);
+      }
+    } catch (error) {
+      console.error('Error in markMessagesAsRead:', error);
+    }
+  };
 
   const fetchMessages = async () => {
     try {

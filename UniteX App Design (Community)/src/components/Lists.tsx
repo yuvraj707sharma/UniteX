@@ -17,89 +17,6 @@ interface ListsProps {
 }
 
 export default function Lists({ onBack }: ListsProps) {
-  const [lists, setLists] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchLists();
-  }, []);
-
-  const fetchLists = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('lists')
-        .select('*, profiles(full_name, username)')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      setLists(data || []);
-    } catch (error) {
-      console.error('Error fetching lists:', error);
-      setLists([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-  const [showCreateList, setShowCreateList] = useState(false);
-  const [showExploreList, setShowExploreList] = useState(false);
-  const [selectedList, setSelectedList] = useState<any>(null);
-  const [listForm, setListForm] = useState({
-    name: "",
-    description: "",
-    is_private: false
-  });
-
-  const handleCreateList = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error('Please log in to create a list');
-        return;
-      }
-
-      const { error } = await supabase
-        .from('lists')
-        .insert({
-          user_id: user.id,
-          name: listForm.name,
-          description: listForm.description,
-          is_private: listForm.is_private
-        });
-
-      if (error) throw error;
-
-      toast.success('List created successfully!');
-      setShowCreateList(false);
-      setListForm({ name: "", description: "", is_private: false });
-      fetchLists();
-    } catch (error) {
-      console.error('Error creating list:', error);
-      toast.error('Failed to create list');
-    }
-  };
-
-  const handleDeleteList = async (listId: string, listName: string) => {
-    try {
-      const { error } = await supabase
-        .from('lists')
-        .delete()
-        .eq('id', listId);
-
-      if (error) throw error;
-
-      setLists((prev) => prev.filter((list) => list.id !== listId));
-      toast.success(`Deleted ${listName}`);
-    } catch (error) {
-      console.error('Error deleting list:', error);
-      toast.error('Failed to delete list');
-    }
-  };
-
-  const handleExploreList = (list: any) => {
-    setSelectedList(list);
-    setShowExploreList(true);
-  };
-
   return (
     <div className="min-h-screen bg-background pb-20 max-w-md mx-auto">
       {/* Header */}
@@ -110,207 +27,140 @@ export default function Lists({ onBack }: ListsProps) {
           </button>
           <div className="flex-1">
             <h1 className="text-foreground text-xl">Lists</h1>
-            <p className="text-muted-foreground text-sm">{lists.length} lists</p>
+            <p className="text-muted-foreground text-sm">Coming Soon</p>
           </div>
-          <button onClick={() => setShowCreateList(true)}>
-            <Plus className="w-6 h-6 dark:text-blue-500 light:text-red-600" />
-          </button>
         </div>
       </div>
 
-      {/* Lists */}
+      {/* Coming Soon Content */}
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.3 }}
-        className="p-4 space-y-3"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="flex flex-col items-center justify-center min-h-[80vh] px-6"
       >
-        {loading ? (
-          <div className="flex items-center justify-center h-96">
-            <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full"></div>
-          </div>
-        ) : lists.length > 0 ? lists.map((list, index) => (
-          <motion.div
-            key={list.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            className="dark:bg-zinc-900 light:bg-gray-50 rounded-2xl p-4 border dark:border-zinc-800 light:border-gray-200 dark:hover:bg-zinc-800 light:hover:bg-gray-100 transition-colors"
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 dark:bg-zinc-800 light:bg-gray-200 rounded-xl flex items-center justify-center flex-shrink-0">
-                <List className="w-6 h-6 dark:text-blue-500 light:text-red-600" />
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="text-foreground">{list.name}</h3>
-                  {list.is_private ? (
-                    <Lock className="w-4 h-4 text-muted-foreground" />
-                  ) : (
-                    <Globe className="w-4 h-4 text-muted-foreground" />
-                  )}
-                </div>
-                <p className="text-muted-foreground text-sm mb-2">{list.description || 'No description'}</p>
-                <Badge className="dark:bg-zinc-800 light:bg-gray-200 dark:text-zinc-300 light:text-gray-700 dark:border-zinc-700 light:border-gray-300 text-xs">
-                  {list.members_count || 0} members
-                </Badge>
-              </div>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="p-2 dark:hover:bg-zinc-800 light:hover:bg-gray-200 rounded-lg transition-colors">
-                    <MoreVertical className="w-5 h-5 text-muted-foreground" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="dark:bg-zinc-900 dark:border-zinc-800 light:bg-white light:border-gray-200">
-                  <DropdownMenuItem onClick={() => handleExploreList(list)} className="dark:hover:bg-zinc-800 light:hover:bg-gray-100">
-                    <Eye className="w-4 h-4 mr-2" />
-                    Explore List
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="dark:hover:bg-zinc-800 light:hover:bg-gray-100">
-                    <Edit className="w-4 h-4 mr-2" />
-                    Edit List
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => handleDeleteList(list.id, list.name)}
-                    className="dark:hover:bg-zinc-800 light:hover:bg-gray-100 text-red-500"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete List
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </motion.div>
-        )) : (
-          <div className="text-center py-8">
-            <div className="text-4xl mb-4">📝</div>
-            <h3 className="text-foreground text-lg mb-2">No lists yet</h3>
-            <p className="text-muted-foreground">Create your first list to organize people!</p>
-          </div>
-        )}
-      </motion.div>
-
-      {/* Create New List Button */}
-      <div className="fixed bottom-24 right-4 max-w-md mx-auto">
-        <Button
-          onClick={() => setShowCreateList(true)}
-          className="w-14 h-14 dark:bg-blue-500 dark:hover:bg-blue-600 light:bg-red-600 light:hover:bg-red-700 text-white rounded-full shadow-lg"
+        {/* Animated Icon */}
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ 
+            type: "spring",
+            stiffness: 200,
+            damping: 15,
+            delay: 0.2
+          }}
+          className="relative mb-8"
         >
-          <Plus className="w-6 h-6" />
-        </Button>
-      </div>
+          <div className="w-32 h-32 rounded-full dark:bg-gradient-to-br dark:from-green-500/20 dark:to-teal-500/20 light:bg-gradient-to-br light:from-green-100 light:to-teal-100 flex items-center justify-center">
+            <List className="w-16 h-16 dark:text-green-500 light:text-green-600" />
+          </div>
+          
+          {/* Sparkle effects */}
+          <motion.div
+            animate={{ 
+              rotate: 360,
+              scale: [1, 1.2, 1]
+            }}
+            transition={{ 
+              duration: 3,
+              repeat: Infinity,
+              ease: "linear"
+            }}
+            className="absolute -top-2 -right-2"
+          >
+            <Sparkles className="w-6 h-6 dark:text-green-400 light:text-green-500" />
+          </motion.div>
+          
+          <motion.div
+            animate={{ 
+              rotate: -360,
+              scale: [1, 1.3, 1]
+            }}
+            transition={{ 
+              duration: 4,
+              repeat: Infinity,
+              ease: "linear",
+              delay: 1
+            }}
+            className="absolute -bottom-2 -left-2"
+          >
+            <Star className="w-5 h-5 dark:text-teal-400 light:text-teal-500" />
+          </motion.div>
+        </motion.div>
 
-      {/* Empty State */}
-      {lists.length === 0 && (
-        <div className="flex items-center justify-center h-96">
-          <div className="text-center space-y-4">
-            <div className="text-6xl mb-4">📝</div>
-            <h2 className="text-foreground text-xl">No lists yet</h2>
-            <p className="text-muted-foreground max-w-sm">
-              Create lists to organize people and stay updated
-            </p>
-            <Button
-              onClick={() => setShowCreateList(true)}
-              className="dark:bg-blue-500 dark:hover:bg-blue-600 light:bg-red-600 light:hover:bg-red-700 text-white rounded-full px-6"
+        {/* Title */}
+        <motion.h2
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="text-3xl font-bold text-foreground mb-4 text-center"
+        >
+          Lists Coming Soon!
+        </motion.h2>
+
+        {/* Description */}
+        <motion.p
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="text-muted-foreground text-center max-w-md mb-8 leading-relaxed"
+        >
+          Create and organize custom lists of people you want to follow. 
+          Keep track of your favorite creators, classmates, or industry experts 
+          in one place.
+        </motion.p>
+
+        {/* Features Preview */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          className="w-full max-w-md space-y-3 mb-8"
+        >
+          {[
+            { icon: "📋", text: "Create custom lists of users" },
+            { icon: "🔒", text: "Public or private list options" },
+            { icon: "📌", text: "Pin your favorite lists" },
+            { icon: "👥", text: "Share lists with friends" }
+          ].map((feature, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.7 + index * 0.1 }}
+              className="flex items-center gap-3 p-3 rounded-xl dark:bg-zinc-900/50 light:bg-gray-50 border dark:border-zinc-800 light:border-gray-200"
             >
-              Create a list
-            </Button>
-          </div>
-        </div>
-      )}
+              <span className="text-2xl">{feature.icon}</span>
+              <span className="text-sm text-foreground">{feature.text}</span>
+            </motion.div>
+          ))}
+        </motion.div>
 
-      {/* Create List Dialog */}
-      <Dialog open={showCreateList} onOpenChange={setShowCreateList}>
-        <DialogContent className="dark:bg-zinc-900 dark:border-zinc-800 light:bg-white light:border-gray-200 max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">Create a List</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Organize people you want to follow
-            </DialogDescription>
-          </DialogHeader>
+        {/* CTA Button */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 1.1 }}
+        >
+          <Button
+            onClick={onBack}
+            className="dark:bg-green-500 dark:hover:bg-green-600 light:bg-green-600 light:hover:bg-green-700 text-white rounded-full px-8 py-6 text-base"
+          >
+            <BookmarkCheck className="w-5 h-5 mr-2" />
+            Back to Home
+          </Button>
+        </motion.div>
 
-          <div className="space-y-4">
-            <Input
-              placeholder="List Name"
-              value={listForm.name}
-              onChange={(e) => setListForm({...listForm, name: e.target.value})}
-            />
-            <Textarea
-              placeholder="Description"
-              value={listForm.description}
-              onChange={(e) => setListForm({...listForm, description: e.target.value})}
-              className="min-h-[80px]"
-            />
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="private"
-                checked={listForm.is_private}
-                onChange={(e) => setListForm({...listForm, is_private: e.target.checked})}
-                className="rounded"
-              />
-              <label htmlFor="private" className="text-sm text-muted-foreground">
-                Make this list private
-              </label>
-            </div>
-            
-            <div className="flex gap-2">
-              <Button
-                onClick={() => setShowCreateList(false)}
-                variant="outline"
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleCreateList}
-                disabled={!listForm.name}
-                className="flex-1 dark:bg-blue-500 dark:hover:bg-blue-600 light:bg-red-600 light:hover:bg-red-700 text-white"
-              >
-                Create List
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Explore List Dialog */}
-      <Dialog open={showExploreList} onOpenChange={setShowExploreList}>
-        <DialogContent className="dark:bg-zinc-900 dark:border-zinc-800 light:bg-white light:border-gray-200 max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">{selectedList?.name}</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              {selectedList?.description}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="text-center py-8">
-              <div className="text-4xl mb-4">👥</div>
-              <p className="text-muted-foreground">
-                {selectedList?.members_count || 0} members in this list
-              </p>
-              <div className="mt-4 p-4 dark:bg-zinc-800 light:bg-gray-100 rounded-lg">
-                <p className="text-sm text-muted-foreground">
-                  Created by: {selectedList?.profiles?.full_name || 'Unknown'}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Privacy: {selectedList?.is_private ? 'Private' : 'Public'}
-                </p>
-              </div>
-            </div>
-            
-            <Button
-              onClick={() => setShowExploreList(false)}
-              className="w-full"
-            >
-              Close
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        {/* Footer Note */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.3 }}
+          className="text-xs text-muted-foreground mt-8"
+        >
+          Stay tuned for organized following ✨
+        </motion.p>
+      </motion.div>
     </div>
   );
 }

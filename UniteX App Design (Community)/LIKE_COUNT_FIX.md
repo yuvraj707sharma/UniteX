@@ -49,13 +49,39 @@ setLikes(likes + 1);
 **After:**
 
 ```typescript
-// Update local state
-setLikes(likes + 1);
+// Store original state
+const wasLiked = liked;
+const originalLikes = likes;
+
+// Optimistic update
+setLiked(!wasLiked);
+setLikes(wasLiked ? originalLikes - 1 : originalLikes + 1);
+
+// THEN database operation
+if (wasLiked) {
+  const { error } = await supabase.from('post_likes').delete();
+  if (error) {
+    if (error.code === 'PGRST116') {
+      toast.info('Already unliked');
+      return; // Don't revert
+    }
+    throw error;
+  }
+} else {
+  const { error } = await supabase.from('post_likes').insert();
+  if (error) {
+    if (error.code === '23505') {
+      toast.info('Already liked!');
+      return; // Don't revert
+    }
+    throw error;
+  }
+}
 
 // Update database
 await supabase
   .from('posts')
-  .update({ likes_count: likes + 1 })
+  .update({ likes_count: wasLiked ? originalLikes - 1 : originalLikes + 1 })
   .eq('id', id);
 
 // Verify from database
@@ -70,6 +96,13 @@ setTimeout(async () => {
     setLikes(data.likes_count || 0);
   }
 }, 500);
+
+// 3. Error handling with revert
+catch (error) {
+  toast.error(`Failed to ${wasLiked ? 'unlike' : 'like'} post`);
+  setLiked(wasLiked);      // Revert to original
+  setLikes(originalLikes);  // Revert to original
+}
 ```
 
 ## What to Do Now
@@ -119,3 +152,4 @@ This triple approach ensures:
 ---
 
 **That's it! Rebuild and test - everything should work now!** 🚀
+

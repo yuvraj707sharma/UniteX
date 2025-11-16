@@ -17,8 +17,6 @@ interface User {
   isFollowing: boolean;
 }
 
-
-
 interface FollowersListProps {
   onBack: () => void;
   onNavigateToProfile?: (username: string) => void;
@@ -40,73 +38,125 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
   const fetchFollowData = async () => {
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) return;
-
-      // Get current user profile
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', authUser.id)
-        .single();
-
-      if (profileError) {
-        console.error('Error fetching profile:', profileError);
-        toast.error('Failed to load profile');
+      if (!authUser) {
+        toast.error('Please log in to view followers');
+        setLoading(false);
         return;
       }
 
-      setCurrentUser(profile);
+      // Determine which user's followers/following to fetch
+      let targetUserId: string;
+      
+      if (username) {
+        // Fetch followers for the specified username (viewing someone else's profile)
+        const { data: targetProfile, error: targetProfileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('username', username)
+          .single();
 
-      // Fetch followers
+        if (targetProfileError || !targetProfile) {
+          console.error('Error fetching target profile:', targetProfileError);
+          toast.error('Failed to load profile');
+          setLoading(false);
+          return;
+        }
+
+        setCurrentUser(targetProfile);
+        targetUserId = targetProfile.id;
+      } else {
+        // Fetch followers for the logged-in user (viewing own profile)
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', authUser.id)
+          .single();
+
+        if (profileError) {
+          console.error('Error fetching profile:', profileError);
+          toast.error('Failed to load profile');
+          setLoading(false);
+          return;
+        }
+
+        setCurrentUser(profile);
+        targetUserId = authUser.id;
+      }
+
+      // Fetch followers for the target user
       const { data: followersData, error: followersError } = await supabase
         .from('follows')
-        .select(`
-          follower_id,
-          profiles!follows_follower_id_fkey(id, full_name, username, department, bio, avatar_url)
-        `)
-        .eq('followed_id', authUser.id);
+        .select('follower_id')
+        .eq('following_id', targetUserId);
 
       if (followersError) {
         console.error('Error fetching followers:', followersError);
         toast.error('Failed to load followers');
       }
 
-      // Fetch following
+      // Fetch following for the target user
       const { data: followingData, error: followingError } = await supabase
         .from('follows')
-        .select(`
-          followed_id,
-          profiles!follows_followed_id_fkey(id, full_name, username, department, bio, avatar_url)
-        `)
-        .eq('follower_id', authUser.id);
+        .select('following_id')
+        .eq('follower_id', targetUserId);
 
       if (followingError) {
         console.error('Error fetching following:', followingError);
         toast.error('Failed to load following');
       }
 
-      const formattedFollowers = followersData?.map(f => ({
-        name: f.profiles.full_name || 'Unknown',
-        username: f.profiles.username || 'unknown',
-        avatar: f.profiles.avatar_url || '',
-        department: f.profiles.department || 'Unknown',
-        bio: f.profiles.bio || 'No bio available',
-        isFollowing: followingData?.some(fw => fw.followed_id === f.profiles.id) || false
-      })) || [];
+      // Fetch the logged-in user's following list to determine isFollowing status
+      const { data: authUserFollowing } = await supabase
+        .from('follows')
+        .select('following_id')
+        .eq('follower_id', authUser.id);
 
-      const formattedFollowing = followingData?.map(f => ({
-        name: f.profiles.full_name || 'Unknown',
-        username: f.profiles.username || 'unknown',
-        avatar: f.profiles.avatar_url || '',
-        department: f.profiles.department || 'Unknown',
-        bio: f.profiles.bio || 'No bio available',
-        isFollowing: true
-      })) || [];
+      const authUserFollowingIds = new Set(authUserFollowing?.map(f => f.following_id) || []);
+
+      // Get follower profiles
+      const followerIds = followersData?.map(f => f.follower_id) || [];
+      const followingIds = followingData?.map(f => f.following_id) || [];
+
+      let formattedFollowers: User[] = [];
+      let formattedFollowing: User[] = [];
+
+      if (followerIds.length > 0) {
+        const { data: followerProfiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, username, department, bio, avatar_url')
+          .in('id', followerIds);
+
+        formattedFollowers = followerProfiles?.map(profile => ({
+          name: profile.full_name || 'Unknown',
+          username: profile.username || 'unknown',
+          avatar: profile.avatar_url || '',
+          department: profile.department || 'Unknown',
+          bio: profile.bio || 'No bio available',
+          isFollowing: authUserFollowingIds.has(profile.id)
+        })) || [];
+      }
+
+      if (followingIds.length > 0) {
+        const { data: followingProfiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, username, department, bio, avatar_url')
+          .in('id', followingIds);
+
+        formattedFollowing = followingProfiles?.map(profile => ({
+          name: profile.full_name || 'Unknown',
+          username: profile.username || 'unknown',
+          avatar: profile.avatar_url || '',
+          department: profile.department || 'Unknown',
+          bio: profile.bio || 'No bio available',
+          isFollowing: authUserFollowingIds.has(profile.id)
+        })) || [];
+      }
 
       setFollowers(formattedFollowers);
       setFollowing(formattedFollowing);
     } catch (error) {
       console.error('Error fetching follow data:', error);
+      toast.error('Failed to load followers list');
       setFollowers([]);
       setFollowing([]);
     } finally {
@@ -171,7 +221,7 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
           .from('follows')
           .delete()
           .eq('follower_id', authUser.id)
-          .eq('followed_id', targetProfile.id);
+          .eq('following_id', targetProfile.id);
         
         if (error) {
           // Check for specific error types
@@ -190,7 +240,7 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
           .from('follows')
           .insert({
             follower_id: authUser.id,
-            followed_id: targetProfile.id
+            following_id: targetProfile.id
           });
         
         if (error) {
@@ -338,7 +388,8 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
 
         <TabsContent value="followers" className="m-0">
           {loading ? (
-            <div className="flex justify-center py-8">
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mb-3"></div>
               <div className="text-muted-foreground">Loading followers...</div>
             </div>
           ) : followers.length > 0 ? (
@@ -352,7 +403,8 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
 
         <TabsContent value="following" className="m-0">
           {loading ? (
-            <div className="flex justify-center py-8">
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mb-3"></div>
               <div className="text-muted-foreground">Loading following...</div>
             </div>
           ) : following.length > 0 ? (

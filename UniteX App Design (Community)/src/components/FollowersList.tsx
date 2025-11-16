@@ -115,34 +115,14 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
         return;
       }
 
-      // Check if already following
-      const { data: existingFollow } = await supabase
-        .from('follows')
-        .select('id')
-        .eq('follower_id', user.id)
-        .eq('followed_id', targetProfile.id)
-        .single();
+      // Find the user in the current list to determine current state
+      const userList = type === "followers" ? followers : following;
+      const targetUser = userList.find(u => u.username === username);
+      if (!targetUser) return;
 
-      if (existingFollow) {
-        // Unfollow
-        await supabase
-          .from('follows')
-          .delete()
-          .eq('follower_id', user.id)
-          .eq('followed_id', targetProfile.id);
-        toast.success('Unfollowed!');
-      } else {
-        // Follow
-        await supabase
-          .from('follows')
-          .insert({
-            follower_id: user.id,
-            followed_id: targetProfile.id
-          });
-        toast.success('Following!');
-      }
+      const wasFollowing = targetUser.isFollowing;
 
-      // Update local state
+      // Optimistically update local state first
       if (type === "followers") {
         setFollowers(
           followers.map((user) =>
@@ -160,9 +140,52 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
           )
         );
       }
+
+      // Then perform database operation
+      if (wasFollowing) {
+        // Unfollow
+        const { error } = await supabase
+          .from('follows')
+          .delete()
+          .eq('follower_id', user.id)
+          .eq('followed_id', targetProfile.id);
+        
+        if (error) throw error;
+        toast.success('Unfollowed!');
+      } else {
+        // Follow
+        const { error } = await supabase
+          .from('follows')
+          .insert({
+            follower_id: user.id,
+            followed_id: targetProfile.id
+          });
+        
+        if (error) throw error;
+        toast.success('Following!');
+      }
     } catch (error) {
       console.error('Error toggling follow:', error);
       toast.error('Failed to update follow status');
+      
+      // Revert optimistic update on error
+      if (type === "followers") {
+        setFollowers(
+          followers.map((user) =>
+            user.username === username
+              ? { ...user, isFollowing: !user.isFollowing }
+              : user
+          )
+        );
+      } else {
+        setFollowing(
+          following.map((user) =>
+            user.username === username
+              ? { ...user, isFollowing: !user.isFollowing }
+              : user
+          )
+        );
+      }
     }
   };
 

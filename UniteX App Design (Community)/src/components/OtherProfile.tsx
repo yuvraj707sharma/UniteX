@@ -117,28 +117,49 @@ export default function OtherProfile({ username, onBack, onNavigateToChat, onNav
 
       if (!targetProfile) return;
 
-      if (isFollowing) {
-        await supabase
+      // Optimistic update
+      const wasFollowing = isFollowing;
+      setIsFollowing(!isFollowing);
+      
+      // Update followers count optimistically
+      setProfile((prev: any) => ({
+        ...prev,
+        followers: wasFollowing ? prev.followers - 1 : prev.followers + 1
+      }));
+
+      if (wasFollowing) {
+        // Unfollow
+        const { error } = await supabase
           .from('follows')
           .delete()
           .eq('follower_id', user.id)
           .eq('followed_id', targetProfile.id);
+        
+        if (error) throw error;
         toast.success('Unfollowed');
       } else {
-        await supabase
+        // Follow
+        const { error } = await supabase
           .from('follows')
           .insert({
             follower_id: user.id,
             followed_id: targetProfile.id
           });
+        
+        if (error) throw error;
         toast.success('Following!');
       }
-
-      setIsFollowing(!isFollowing);
-      fetchUserProfile();
     } catch (error) {
       console.error('Error toggling follow:', error);
       toast.error('Failed to update follow status');
+      
+      // Revert optimistic update on error
+      const wasFollowing = isFollowing;
+      setIsFollowing(!isFollowing);
+      setProfile((prev: any) => ({
+        ...prev,
+        followers: wasFollowing ? prev.followers - 1 : prev.followers + 1
+      }));
     }
   };
 

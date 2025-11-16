@@ -16,7 +16,7 @@ interface ProfileProps {
 
 
 
-export default function Profile({ onNavigateToFollowers, onNavigateToSettings }: ProfileProps = {}) {
+export default function Profile({ onNavigateToFollowers, onNavigateToSettings }: ProfileProps) {
   const [showEditProfile, setShowEditProfile] = useState(false)
   const [profileData, setProfileData] = useState<any>(null)
   const [userPosts, setUserPosts] = useState<any[]>([])

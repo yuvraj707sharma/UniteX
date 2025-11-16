@@ -14,7 +14,7 @@ interface SearchProps {
 
 
 
-export default function Search({ onNavigateToProfile }: SearchProps = {}) {
+export default function Search({ onNavigateToProfile }: SearchProps = { onNavigateToProfile: undefined }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("top");
   const [users, setUsers] = useState<any[]>([]);
@@ -35,13 +35,17 @@ export default function Search({ onNavigateToProfile }: SearchProps = {}) {
       setLoading(true);
       const query = searchQuery.toLowerCase();
 
-      const { data: usersData } = await supabase
+      const { data: usersData, error: usersError } = await supabase
         .from('profiles')
         .select('id, full_name, username, department, avatar_url, bio')
         .or(`full_name.ilike.%${query}%,username.ilike.%${query}%,department.ilike.%${query}%`)
         .limit(10);
 
-      const { data: postsData } = await supabase
+      if (usersError) {
+        console.error('Error searching users:', usersError);
+      }
+
+      const { data: postsData, error: postsError } = await supabase
         .from('posts')
         .select(`
           *,
@@ -50,10 +54,16 @@ export default function Search({ onNavigateToProfile }: SearchProps = {}) {
         .ilike('content', `%${query}%`)
         .limit(10);
 
+      if (postsError) {
+        console.error('Error searching posts:', postsError);
+      }
+
       setUsers(usersData || []);
       setPosts(postsData || []);
     } catch (error) {
       console.error('Search error:', error);
+      setUsers([]);
+      setPosts([]);
     } finally {
       setLoading(false);
     }
@@ -65,6 +75,7 @@ export default function Search({ onNavigateToProfile }: SearchProps = {}) {
       setSearchQuery(sanitizedQuery);
     } catch (error) {
       console.error('Error handling search input:', error);
+      setSearchQuery('');
     }
   };
 
@@ -77,19 +88,38 @@ export default function Search({ onNavigateToProfile }: SearchProps = {}) {
     bio: u.bio
   }));
 
-  const filteredPosts = posts.map(p => ({
-    id: p.id,
-    author: p.profiles.full_name,
-    username: p.profiles.username,
-    department: p.profiles.department,
-    content: p.content,
-    likes: p.likes_count || 0,
-    comments: p.comments_count || 0,
-    shares: p.shares_count || 0,
-    timeAgo: new Date(p.created_at).toLocaleDateString(),
-    avatar: p.profiles.avatar_url,
-    image: p.media_urls?.[0]
-  }));
+  const filteredPosts = posts.map(p => {
+    try {
+      return {
+        id: p.id,
+        author: p.profiles?.full_name || 'Unknown User',
+        username: p.profiles?.username || 'unknown',
+        department: p.profiles?.department || 'Unknown',
+        content: p.content || '',
+        likes: p.likes_count || 0,
+        comments: p.comments_count || 0,
+        shares: p.shares_count || 0,
+        timeAgo: p.created_at ? new Date(p.created_at).toLocaleDateString() : 'Unknown',
+        avatar: p.profiles?.avatar_url || '',
+        image: p.media_urls?.[0]
+      };
+    } catch (error) {
+      console.error('Error mapping post data:', error);
+      return {
+        id: p.id || 'unknown',
+        author: 'Unknown User',
+        username: 'unknown',
+        department: 'Unknown',
+        content: '',
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        timeAgo: 'Unknown',
+        avatar: '',
+        image: undefined
+      };
+    }
+  });
 
   return (
     <div className="min-h-screen bg-background pb-20 max-w-md mx-auto">

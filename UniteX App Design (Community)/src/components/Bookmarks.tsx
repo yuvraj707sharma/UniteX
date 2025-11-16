@@ -19,14 +19,24 @@ export default function Bookmarks({ onBack }: BookmarksProps) {
 
   const fetchCurrentUser = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError) {
+        console.error('Auth error:', authError);
+        return;
+      }
+      
       if (!user) return;
 
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single();
+
+      if (profileError) {
+        console.error('Profile fetch error:', profileError);
+        return;
+      }
 
       if (profile) {
         setCurrentUser(profile);
@@ -60,19 +70,15 @@ export default function Bookmarks({ onBack }: BookmarksProps) {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.3 }}
       >
-        {false ? (
-          []
-        ) : (
-          <div className="flex items-center justify-center h-96">
-            <div className="text-center space-y-4">
-              <div className="text-6xl mb-4">🔖</div>
-              <h2 className="text-foreground text-xl">Save posts for later</h2>
-              <p className="text-muted-foreground max-w-sm">
-                Bookmark posts to easily find them again in the future.
-              </p>
-            </div>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center space-y-4">
+            <div className="text-6xl mb-4">🔖</div>
+            <h2 className="text-foreground text-xl">Save posts for later</h2>
+            <p className="text-muted-foreground max-w-sm">
+              Bookmark posts to easily find them again in the future.
+            </p>
           </div>
-        )}
+        </div>
       </motion.div>
     </div>
   );

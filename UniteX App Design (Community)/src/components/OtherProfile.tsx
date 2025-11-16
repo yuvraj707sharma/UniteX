@@ -28,7 +28,12 @@ export default function OtherProfile({ username, onBack, onNavigateToChat, onNav
 
   const fetchUserProfile = async () => {
     try {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+      if (authError) {
+        console.error('Auth error:', authError);
+        toast.error('Authentication failed');
+        return;
+      }
       
       const { data: profileData, error } = await supabase
         .from('profiles')
@@ -36,31 +41,53 @@ export default function OtherProfile({ username, onBack, onNavigateToChat, onNav
         .eq('username', username)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === 'PGRST116') {
+          toast.error('User not found');
+          return;
+        }
+        throw error;
+      }
 
-      const { data: posts } = await supabase
+      const { data: posts, error: postsError } = await supabase
         .from('posts')
         .select('*')
         .eq('author_id', profileData.id)
         .order('created_at', { ascending: false });
 
-      const { data: followers } = await supabase
+      if (postsError) {
+        console.error('Posts fetch error:', postsError);
+      }
+
+      const { data: followers, error: followersError } = await supabase
         .from('follows')
         .select('id')
-        .eq('followed_id', profileData.id);
+        .eq('following_id', profileData.id);
 
-      const { data: following } = await supabase
+      if (followersError) {
+        console.error('Followers fetch error:', followersError);
+      }
+
+      const { data: following, error: followingError } = await supabase
         .from('follows')
         .select('id')
         .eq('follower_id', profileData.id);
 
+      if (followingError) {
+        console.error('Following fetch error:', followingError);
+      }
+
       if (currentUser) {
-        const { data: followStatus } = await supabase
+        const { data: followStatus, error: followError } = await supabase
           .from('follows')
           .select('id')
           .eq('follower_id', currentUser.id)
-          .eq('followed_id', profileData.id)
-          .single();
+          .eq('following_id', profileData.id)
+          .maybeSingle();
+        
+        if (followError) {
+          console.error('Follow status error:', followError);
+        }
         
         setIsFollowing(!!followStatus);
       }
@@ -102,26 +129,40 @@ export default function OtherProfile({ username, onBack, onNavigateToChat, onNav
   };
 
   const handleFollowToggle = async () => {
+    const wasFollowing = isFollowing;
+    
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError) {
+        console.error('Auth error:', authError);
+        toast.error('Authentication failed');
+        return;
+      }
+      
       if (!user) {
         toast.error('Please log in to follow');
         return;
       }
 
-      const { data: targetProfile } = await supabase
+      const { data: targetProfile, error: profileError } = await supabase
         .from('profiles')
         .select('id')
         .eq('username', username)
         .single();
 
-      if (!targetProfile) return;
+      if (profileError) {
+        console.error('Profile fetch error:', profileError);
+        toast.error('User not found');
+        return;
+      }
+
+      if (!targetProfile) {
+        toast.error('User not found');
+        return;
+      }
 
       // Optimistic update
-      const wasFollowing = isFollowing;
-      setIsFollowing(!isFollowing);
-      
-      // Update followers count optimistically
+      setIsFollowing(!wasFollowing);
       setProfile((prev: any) => ({
         ...prev,
         followers: wasFollowing ? prev.followers - 1 : prev.followers + 1
@@ -133,9 +174,16 @@ export default function OtherProfile({ username, onBack, onNavigateToChat, onNav
           .from('follows')
           .delete()
           .eq('follower_id', user.id)
-          .eq('followed_id', targetProfile.id);
+          .eq('following_id', targetProfile.id);
         
-        if (error) throw error;
+        if (error) {
+          if (error.code === 'PGRST116') {
+            toast.info('Already unfollowed');
+            return;
+          }
+          console.error('Unfollow error:', error);
+          throw error;
+        }
         toast.success('Unfollowed');
       } else {
         // Follow
@@ -143,22 +191,28 @@ export default function OtherProfile({ username, onBack, onNavigateToChat, onNav
           .from('follows')
           .insert({
             follower_id: user.id,
-            followed_id: targetProfile.id
+            following_id: targetProfile.id
           });
         
-        if (error) throw error;
+        if (error) {
+          if (error.code === '23505') {
+            toast.info('Already following');
+            return;
+          }
+          console.error('Follow error:', error);
+          throw error;
+        }
         toast.success('Following!');
       }
     } catch (error) {
       console.error('Error toggling follow:', error);
       toast.error('Failed to update follow status');
       
-      // Revert optimistic update on error
-      const wasFollowing = isFollowing;
-      setIsFollowing(!isFollowing);
+      // Revert optimistic update
+      setIsFollowing(wasFollowing);
       setProfile((prev: any) => ({
         ...prev,
-        followers: wasFollowing ? prev.followers - 1 : prev.followers + 1
+        followers: wasFollowing ? prev.followers + 1 : prev.followers - 1
       }));
     }
   };

@@ -51,22 +51,51 @@ export default function AccountSettings({ onBack }: AccountSettingsProps) {
 
   const handleSave = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError) {
+        console.error('Auth error:', authError);
+        toast.error('Authentication failed');
+        return;
+      }
+      
       if (!user) {
         toast.error('Please log in to update your account');
+        return;
+      }
+
+      // Validate inputs
+      if (!name.trim()) {
+        toast.error('Name is required');
+        return;
+      }
+      
+      if (!username.trim()) {
+        toast.error('Username is required');
+        return;
+      }
+      
+      if (!email.trim()) {
+        toast.error('Email is required');
         return;
       }
 
       const { error } = await supabase
         .from('profiles')
         .update({
-          full_name: name,
-          username: username,
-          email: email
+          full_name: name.trim(),
+          username: username.trim(),
+          email: email.trim()
         })
         .eq('id', user.id);
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === '23505') {
+          toast.error('Username or email already exists');
+          return;
+        }
+        console.error('Update error:', error);
+        throw error;
+      }
 
       toast.success("Account information updated!");
     } catch (error) {
@@ -75,20 +104,42 @@ export default function AccountSettings({ onBack }: AccountSettingsProps) {
     }
   };
 
-  const handleChangePassword = () => {
-    if (!oldPassword || !newPassword || !confirmPassword) {
-      toast.error("Please fill all fields");
-      return;
+  const handleChangePassword = async () => {
+    try {
+      if (!oldPassword || !newPassword || !confirmPassword) {
+        toast.error("Please fill all fields");
+        return;
+      }
+      
+      if (newPassword !== confirmPassword) {
+        toast.error("Passwords don't match");
+        return;
+      }
+      
+      if (newPassword.length < 6) {
+        toast.error("Password must be at least 6 characters");
+        return;
+      }
+
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) {
+        console.error('Password update error:', error);
+        toast.error('Failed to update password');
+        return;
+      }
+
+      toast.success("Password changed successfully!");
+      setShowPasswordDialog(false);
+      setOldPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error) {
+      console.error('Error changing password:', error);
+      toast.error('Failed to change password');
     }
-    if (newPassword !== confirmPassword) {
-      toast.error("Passwords don't match");
-      return;
-    }
-    toast.success("Password changed successfully!");
-    setShowPasswordDialog(false);
-    setOldPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
   };
 
   const handleVerification = () => {

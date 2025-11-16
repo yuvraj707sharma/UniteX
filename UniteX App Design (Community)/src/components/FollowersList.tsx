@@ -127,7 +127,7 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
         setFollowers(
           followers.map((user) =>
             user.username === username
-              ? { ...user, isFollowing: !user.isFollowing }
+              ? { ...user, isFollowing: !wasFollowing }
               : user
           )
         );
@@ -135,7 +135,7 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
         setFollowing(
           following.map((user) =>
             user.username === username
-              ? { ...user, isFollowing: !user.isFollowing }
+              ? { ...user, isFollowing: !wasFollowing }
               : user
           )
         );
@@ -150,7 +150,16 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
           .eq('follower_id', user.id)
           .eq('followed_id', targetProfile.id);
         
-        if (error) throw error;
+        if (error) {
+          // Check for specific error types
+          if (error.code === 'PGRST116') {
+            // No rows found - already unfollowed
+            console.log('Already unfollowed');
+            toast.info('Already unfollowed');
+            return; // Don't revert - state is correct
+          }
+          throw error;
+        }
         toast.success('Unfollowed!');
       } else {
         // Follow
@@ -161,19 +170,31 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
             followed_id: targetProfile.id
           });
         
-        if (error) throw error;
+        if (error) {
+          // Check for specific error types
+          if (error.code === '23505') {
+            // Duplicate key - already following
+            console.log('Already following');
+            toast.info('Already following!');
+            return; // Don't revert - state is correct
+          }
+          throw error;
+        }
         toast.success('Following!');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error toggling follow:', error);
-      toast.error('Failed to update follow status');
       
-      // Revert optimistic update on error
+      // Provide specific error messages
+      const errorMessage = error?.message || 'Unknown error occurred';
+      toast.error(`Failed to ${wasFollowing ? 'unfollow' : 'follow'}: ${errorMessage}`);
+      
+      // Revert optimistic update on error using the original state
       if (type === "followers") {
         setFollowers(
           followers.map((user) =>
             user.username === username
-              ? { ...user, isFollowing: !user.isFollowing }
+              ? { ...user, isFollowing: wasFollowing }
               : user
           )
         );
@@ -181,7 +202,7 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
         setFollowing(
           following.map((user) =>
             user.username === username
-              ? { ...user, isFollowing: !user.isFollowing }
+              ? { ...user, isFollowing: wasFollowing }
               : user
           )
         );

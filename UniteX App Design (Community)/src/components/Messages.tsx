@@ -22,7 +22,7 @@ interface MessagesProps {
   onChatStateChange?: (inChat: boolean) => void;
 }
 
-export default function Messages({ initialChat, onClearUnread, onChatStateChange }: MessagesProps = {}) {
+export default function Messages({ initialChat, onClearUnread, onChatStateChange }: MessagesProps = { initialChat: null, onClearUnread: undefined, onChatStateChange: undefined }) {
   const [selectedChat, setSelectedChat] = useState<{
     name: string;
     username: string;
@@ -46,8 +46,17 @@ export default function Messages({ initialChat, onClearUnread, onChatStateChange
 
   const fetchConversations = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError) {
+        console.error('Auth error:', authError);
+        toast.error('Failed to authenticate user');
+        setLoading(false);
+        return;
+      }
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
       const { data: messages, error } = await supabase
         .from('messages')
@@ -61,6 +70,7 @@ export default function Messages({ initialChat, onClearUnread, onChatStateChange
 
       if (error) {
         console.error('Error fetching messages:', error);
+        toast.error('Failed to load conversations');
         setConversations([]);
         setLoading(false);
         return;
@@ -100,6 +110,7 @@ export default function Messages({ initialChat, onClearUnread, onChatStateChange
       setConversations(Array.from(conversationMap.values()));
     } catch (error) {
       console.error('Error fetching conversations:', error);
+      toast.error('Failed to load conversations');
       setConversations([]);
     } finally {
       setLoading(false);
@@ -123,6 +134,8 @@ export default function Messages({ initialChat, onClearUnread, onChatStateChange
       setSearchResults(data || []);
     } catch (error) {
       console.error('Error searching users:', error);
+      toast.error('Failed to search users');
+      setSearchResults([]);
     }
   };
 

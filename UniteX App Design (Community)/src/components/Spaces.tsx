@@ -61,8 +61,16 @@ export default function Vartalaap({ onBack }: SpacesProps) {
   }, []);
 
   const getCurrentUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    setCurrentUser(user);
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error) {
+        console.error('Error getting current user:', error);
+        return;
+      }
+      setCurrentUser(user);
+    } catch (error) {
+      console.error('Error in getCurrentUser:', error);
+    }
   };
 
   useEffect(() => {
@@ -145,10 +153,15 @@ export default function Vartalaap({ onBack }: SpacesProps) {
       if (error) throw error;
 
       // Update member count
-      await supabase
+      const { error: updateError } = await supabase
         .from('spaces')
         .update({ member_count: (space.member_count || 0) + 1 })
         .eq('id', space.id);
+
+      if (updateError) {
+        console.error('Error updating member count:', updateError);
+        // Don't throw here as the main join operation succeeded
+      }
 
       toast.success(`Joined ${space.name}!`);
       setJoinedSpace(space);
@@ -180,7 +193,11 @@ export default function Vartalaap({ onBack }: SpacesProps) {
       toast.success('Space created successfully!');
       setShowCreateSpace(false);
       setSpaceForm({ title: "", description: "", topic: "", scheduled_for: "" });
-      fetchSpaces();
+      try {
+        await fetchSpaces();
+      } catch (error) {
+        console.error('Error refreshing spaces:', error);
+      }
     } catch (error) {
       console.error('Error creating space:', error);
       toast.error('Failed to create space');

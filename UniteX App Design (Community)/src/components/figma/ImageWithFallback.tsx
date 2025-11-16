@@ -7,7 +7,11 @@ export function ImageWithFallback(props: React.ImgHTMLAttributes<HTMLImageElemen
   const [didError, setDidError] = useState(false)
 
   const handleError = () => {
-    setDidError(true)
+    try {
+      setDidError(true)
+    } catch (error) {
+      console.error('Error handling image fallback:', error)
+    }
   }
 
   const { src, alt, style, className, ...rest } = props

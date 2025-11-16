@@ -61,7 +61,7 @@ export default function EditProfile({ onBack, profile, onSave }: EditProfileProp
       const reader = new FileReader()
       reader.onload = (e) => {
         const result = e.target?.result
-        if (typeof result === 'string') {
+        if (typeof result === 'string' && result.startsWith('data:image/')) {
           setAvatarPreview(result)
         }
       }
@@ -209,9 +209,15 @@ export default function EditProfile({ onBack, profile, onSave }: EditProfileProp
         <div className="flex flex-col items-center space-y-4">
           <div className="relative">
             <Avatar className="w-32 h-32 border-4 border-border">
-              <AvatarImage src={avatarPreview} className="object-cover" />
+              <AvatarImage 
+                src={avatarPreview?.startsWith('data:image/') || (avatarPreview?.startsWith('http') && validateUrl(avatarPreview)) ? avatarPreview : ''} 
+                className="object-cover" 
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
               <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black text-3xl">
-                {formData.name.charAt(0)}
+                {sanitizeHtml(formData.name).charAt(0) || 'U'}
               </AvatarFallback>
             </Avatar>
             <button
@@ -297,7 +303,7 @@ export default function EditProfile({ onBack, profile, onSave }: EditProfileProp
                   variant="secondary"
                   className="flex items-center gap-1"
                 >
-                  {skill}
+                  {sanitizeHtml(skill)}
                   <button
                     onClick={() => removeSkill(skill)}
                     className="hover:text-destructive"

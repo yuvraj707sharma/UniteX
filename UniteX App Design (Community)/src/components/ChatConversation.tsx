@@ -39,23 +39,52 @@ export default function ChatConversation({ onBack, user, onClearUnread }: ChatCo
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchMessages();
-    onClearUnread?.();
+    const initializeChat = async () => {
+      try {
+        await fetchMessages();
+        try {
+          onClearUnread?.();
+        } catch (clearError) {
+          console.error('Error clearing unread messages:', clearError);
+        }
+      } catch (error) {
+        console.error('Error initializing chat:', error);
+        toast.error('Failed to load chat');
+      }
+    };
+    
+    initializeChat();
   }, [user.id]);
 
   const fetchMessages = async () => {
     try {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (!currentUser) return;
+      const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+      if (authError) {
+        console.error('Auth error:', authError);
+        toast.error('Failed to authenticate user');
+        setLoading(false);
+        return;
+      }
+      if (!currentUser) {
+        setLoading(false);
+        return;
+      }
       
       setCurrentUserId(currentUser.id);
 
       // Get the receiver's profile to get their user ID
-      const { data: receiverProfile } = await supabase
+      const { data: receiverProfile, error: profileError } = await supabase
         .from('profiles')
         .select('id')
         .eq('username', user.username)
         .single();
+
+      if (profileError) {
+        console.error('Profile error:', profileError);
+        toast.error('Failed to find user profile');
+        setLoading(false);
+        return;
+      }
 
       if (!receiverProfile) {
         console.log('Receiver profile not found');
@@ -69,7 +98,11 @@ export default function ChatConversation({ onBack, user, onClearUnread }: ChatCo
         .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${receiverProfile.id}),and(sender_id.eq.${receiverProfile.id},receiver_id.eq.${currentUser.id})`)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Messages error:', error);
+        toast.error('Failed to load messages');
+        throw error;
+      }
 
       const formattedMessages = data?.map((msg: any) => ({
         id: msg.id,
@@ -87,6 +120,7 @@ export default function ChatConversation({ onBack, user, onClearUnread }: ChatCo
       setMessages(formattedMessages);
     } catch (error) {
       console.error('Error fetching messages:', error);
+      toast.error('Failed to load conversation');
     } finally {
       setLoading(false);
     }
@@ -100,21 +134,26 @@ export default function ChatConversation({ onBack, user, onClearUnread }: ChatCo
   } | null>(null);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    try {
+      const file = event.target.files?.[0];
+      if (!file) return;
 
-    const fileType = file.type.startsWith("image") ? "image" : "video";
-    const fileURL = URL.createObjectURL(file);
+      const fileType = file.type.startsWith("image") ? "image" : "video";
+      const fileURL = URL.createObjectURL(file);
 
-    setSelectedMedia({
-      file,
-      type: fileType,
-      url: fileURL,
-    });
+      setSelectedMedia({
+        file,
+        type: fileType,
+        url: fileURL,
+      });
 
-    // Reset file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } catch (error) {
+      console.error('Error handling file upload:', error);
+      toast.error('Failed to upload file');
     }
   };
 
@@ -127,11 +166,17 @@ export default function ChatConversation({ onBack, user, onClearUnread }: ChatCo
         : inputText;
 
       // Get the receiver's profile to get their user ID
-      const { data: receiverProfile } = await supabase
+      const { data: receiverProfile, error: profileError } = await supabase
         .from('profiles')
         .select('id')
         .eq('username', user.username)
         .single();
+
+      if (profileError) {
+        console.error('Profile lookup error:', profileError);
+        toast.error('Failed to find user');
+        return;
+      }
 
       if (!receiverProfile) {
         toast.error('User not found');

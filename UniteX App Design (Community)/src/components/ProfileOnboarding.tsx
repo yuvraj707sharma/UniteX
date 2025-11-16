@@ -132,7 +132,11 @@ export default function ProfileOnboarding({ onComplete, userEmail }: ProfileOnbo
       
       // Wait a moment for the toast to show, then complete
       setTimeout(() => {
-        onComplete(profileData);
+        try {
+          onComplete(profileData);
+        } catch (error) {
+          console.error('Error completing profile setup:', error);
+        }
       }, 1000);
     } catch (error) {
       console.error('Profile completion error:', error);

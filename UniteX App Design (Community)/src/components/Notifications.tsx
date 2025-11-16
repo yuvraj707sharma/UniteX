@@ -37,13 +37,23 @@ interface NotificationItemProps {
 
 function NotificationItem({ notification, onAccept, onDecline, onMarkAsRead, onNavigateToPost }: NotificationItemProps) {
   const handleClick = () => {
-    if (!notification.read && onMarkAsRead) {
-      onMarkAsRead(notification.id);
-    }
-    
-    // Navigate to relevant content
-    if (notification.type === "like" || notification.type === "comment" || notification.type === "mention") {
-      onNavigateToPost?.(notification.username);
+    try {
+      if (!notification.read && onMarkAsRead) {
+        onMarkAsRead(notification.id);
+      }
+      
+      // Navigate to relevant content
+      if (notification.type === "like" || notification.type === "comment" || notification.type === "mention") {
+        try {
+          onNavigateToPost?.(notification.username);
+        } catch (navError) {
+          console.error('Error navigating to post:', navError);
+          toast.error('Failed to navigate to content');
+        }
+      }
+    } catch (error) {
+      console.error('Error handling notification click:', error);
+      toast.error('Failed to process notification');
     }
   };
 
@@ -58,7 +68,7 @@ function NotificationItem({ notification, onAccept, onDecline, onMarkAsRead, onN
       <Avatar className="w-12 h-12">
         <AvatarImage src={notification.avatar} />
         <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black">
-          {notification.user.charAt(0)}
+          {notification.user?.charAt(0) || 'U'}
         </AvatarFallback>
       </Avatar>
 

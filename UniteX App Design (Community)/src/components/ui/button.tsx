@@ -49,7 +49,14 @@ function Button({
   return (
     <Comp
       data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
+      className={(() => {
+        try {
+          return cn(buttonVariants({ variant, size, className }));
+        } catch (error) {
+          console.error('Error generating button classes:', error);
+          return 'inline-flex items-center justify-center';
+        }
+      })()}
       {...props}
     />
   );

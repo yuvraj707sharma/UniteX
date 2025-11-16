@@ -143,8 +143,13 @@ export default function AccountSettings({ onBack }: AccountSettingsProps) {
   };
 
   const handleVerification = () => {
-    toast.success("Verification request submitted! We'll review it within 24 hours.");
-    setShowVerificationDialog(false);
+    try {
+      toast.success("Verification request submitted! We'll review it within 24 hours.");
+      setShowVerificationDialog(false);
+    } catch (error) {
+      console.error('Error handling verification:', error);
+      toast.error('Failed to submit verification request');
+    }
   };
 
   return (
@@ -223,7 +228,14 @@ export default function AccountSettings({ onBack }: AccountSettingsProps) {
         {/* Additional Options */}
         <div className="pt-6 space-y-3">
           <button
-            onClick={() => setShowPasswordDialog(true)}
+            onClick={() => {
+              try {
+                setShowPasswordDialog(true);
+              } catch (error) {
+                console.error('Error opening password dialog:', error);
+                toast.error('Failed to open password dialog');
+              }
+            }}
             className="w-full p-4 dark:bg-zinc-900 light:bg-gray-50 rounded-2xl border dark:border-zinc-800 light:border-gray-200 text-left dark:hover:bg-zinc-800 light:hover:bg-gray-100 transition-colors"
           >
             <div className="flex items-center gap-3">
@@ -236,7 +248,14 @@ export default function AccountSettings({ onBack }: AccountSettingsProps) {
           </button>
 
           <button
-            onClick={() => setShowVerificationDialog(true)}
+            onClick={() => {
+              try {
+                setShowVerificationDialog(true);
+              } catch (error) {
+                console.error('Error opening verification dialog:', error);
+                toast.error('Failed to open verification dialog');
+              }
+            }}
             className="w-full p-4 dark:bg-zinc-900 light:bg-gray-50 rounded-2xl border dark:border-zinc-800 light:border-gray-200 text-left dark:hover:bg-zinc-800 light:hover:bg-gray-100 transition-colors"
           >
             <div className="flex items-center gap-3">

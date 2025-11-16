@@ -103,17 +103,26 @@ function PaginationEllipsis({
   className,
   ...props
 }: React.ComponentProps<"span">) {
-  return (
-    <span
-      aria-hidden
-      data-slot="pagination-ellipsis"
-      className={cn("flex size-9 items-center justify-center", className)}
-      {...props}
-    >
-      <MoreHorizontalIcon className="size-4" />
-      <span className="sr-only">More pages</span>
-    </span>
-  );
+  try {
+    return (
+      <span
+        aria-hidden
+        data-slot="pagination-ellipsis"
+        className={cn("flex size-9 items-center justify-center", className)}
+        {...props}
+      >
+        <MoreHorizontalIcon className="size-4" />
+        <span className="sr-only">More pages</span>
+      </span>
+    );
+  } catch (error) {
+    console.error('Error rendering PaginationEllipsis:', error);
+    return (
+      <span className="flex size-9 items-center justify-center">
+        <span>...</span>
+      </span>
+    );
+  }
 }
 
 export {

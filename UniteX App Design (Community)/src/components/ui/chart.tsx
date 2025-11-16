@@ -78,20 +78,39 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
     return null;
   }
 
+  // Sanitize inputs to prevent XSS
+  const sanitizeId = (str: string) => str.replace(/[^a-zA-Z0-9-_]/g, '');
+  const sanitizeKey = (str: string) => str.replace(/[^a-zA-Z0-9-_]/g, '');
+  const sanitizeColor = (str: string) => {
+    // Only allow valid CSS color formats
+    if (/^#[0-9a-fA-F]{3,8}$/.test(str) || 
+        /^rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)$/.test(str) ||
+        /^rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*[0-9.]+\s*\)$/.test(str) ||
+        /^hsl\(\s*\d+\s*,\s*\d+%\s*,\s*\d+%\s*\)$/.test(str)) {
+      return str;
+    }
+    return '';
+  };
+
+  const sanitizedId = sanitizeId(id);
+
   return (
     <style
       dangerouslySetInnerHTML={{
         __html: Object.entries(THEMES)
           .map(
             ([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
+${prefix} [data-chart=${sanitizedId}] {
 ${colorConfig
   .map(([key, itemConfig]) => {
     const color =
       itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
       itemConfig.color;
-    return color ? `  --color-${key}: ${color};` : null;
+    const sanitizedKey = sanitizeKey(key);
+    const sanitizedColor = color ? sanitizeColor(String(color)) : '';
+    return sanitizedColor ? `  --color-${sanitizedKey}: ${sanitizedColor};` : null;
   })
+  .filter(Boolean)
   .join("\n")}
 }
 `,
@@ -234,7 +253,16 @@ function ChartTooltipContent({
                     </div>
                     {item.value && (
                       <span className="text-foreground font-mono font-medium tabular-nums">
-                        {item.value.toLocaleString()}
+                        {(() => {
+                          try {
+                            return typeof item.value === 'number' 
+                              ? item.value.toLocaleString() 
+                              : String(item.value);
+                          } catch (error) {
+                            console.error('Error formatting chart value:', error);
+                            return String(item.value);
+                          }
+                        })()}
                       </span>
                     )}
                   </div>

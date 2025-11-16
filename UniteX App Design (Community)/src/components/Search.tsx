@@ -198,7 +198,13 @@ export default function Search({ onNavigateToProfile }: SearchProps = { onNaviga
                   {filteredUsers.slice(0, 5).map((user) => (
                     <button
                       key={user.id}
-                      onClick={() => onNavigateToProfile?.(user.username)}
+                      onClick={() => {
+                        try {
+                          onNavigateToProfile?.(user.username);
+                        } catch (error) {
+                          console.error('Error navigating to profile:', error);
+                        }
+                      }}
                       className="w-full flex items-center gap-3 p-3 dark:hover:bg-zinc-900 light:hover:bg-gray-50 rounded-xl transition-colors"
                     >
                       <Avatar className="w-12 h-12">
@@ -230,7 +236,13 @@ export default function Search({ onNavigateToProfile }: SearchProps = { onNaviga
             {filteredUsers.map((user) => (
               <button
                 key={user.id}
-                onClick={() => onNavigateToProfile?.(user.username)}
+                onClick={() => {
+                  try {
+                    onNavigateToProfile?.(user.username);
+                  } catch (error) {
+                    console.error('Error navigating to profile:', error);
+                  }
+                }}
                 className="w-full flex items-start gap-3 p-4 border-b dark:border-zinc-800 light:border-gray-200 dark:hover:bg-zinc-950 light:hover:bg-gray-50 transition-colors"
               >
                 <Avatar className="w-12 h-12">

@@ -16,28 +16,38 @@ export default function SecuritySettings({ onBack }: SecuritySettingsProps) {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  const handleChangePassword = () => {
-    if (!oldPassword || !newPassword || !confirmPassword) {
-      toast.error("Please fill all fields");
-      return;
+  const handleChangePassword = async () => {
+    try {
+      if (!oldPassword || !newPassword || !confirmPassword) {
+        toast.error("Please fill all fields");
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        toast.error("Passwords don't match");
+        return;
+      }
+      toast.success("Password changed successfully!");
+      setOldPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error) {
+      console.error('Error changing password:', error);
+      toast.error('Failed to change password');
     }
-    if (newPassword !== confirmPassword) {
-      toast.error("Passwords don't match");
-      return;
-    }
-    toast.success("Password changed successfully!");
-    setOldPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
   };
 
-  const handleToggleTwoFactor = () => {
-    setTwoFactorEnabled(!twoFactorEnabled);
-    toast.success(
-      twoFactorEnabled
-        ? "Two-factor authentication disabled"
-        : "Two-factor authentication enabled"
-    );
+  const handleToggleTwoFactor = async () => {
+    try {
+      setTwoFactorEnabled(!twoFactorEnabled);
+      toast.success(
+        twoFactorEnabled
+          ? "Two-factor authentication disabled"
+          : "Two-factor authentication enabled"
+      );
+    } catch (error) {
+      console.error('Error toggling two-factor authentication:', error);
+      toast.error('Failed to update two-factor authentication');
+    }
   };
 
   return (

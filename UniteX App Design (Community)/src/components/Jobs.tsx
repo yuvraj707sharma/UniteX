@@ -340,7 +340,28 @@ export default function Jobs({ onBack }: JobsProps) {
               <input
                 type="file"
                 accept=".pdf,.doc,.docx"
-                onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
+                onChange={(e) => {
+                  try {
+                    const files = e.target.files;
+                    if (!files || files.length === 0) {
+                      setResumeFile(null);
+                      return;
+                    }
+                    
+                    const file = files[0];
+                    if (file.size > 10 * 1024 * 1024) {
+                      toast.error('File size must be less than 10MB');
+                      e.target.value = '';
+                      return;
+                    }
+                    
+                    setResumeFile(file);
+                  } catch (error) {
+                    console.error('Error handling file selection:', error);
+                    toast.error('Failed to select file');
+                    setResumeFile(null);
+                  }
+                }}
                 className="w-full p-2 border rounded-md dark:bg-zinc-800 dark:border-zinc-700 light:bg-white light:border-gray-300 text-foreground"
               />
             </div>

@@ -42,15 +42,23 @@ export default function VartalaapRoom({ space, onLeave }: SpaceRoomProps) {
   }, [space.id]);
 
   const getCurrentUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-      setCurrentUser(profile);
-      setIsHost(space.created_by === user.id);
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      
+      if (user) {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        
+        if (profileError) throw profileError;
+        setCurrentUser(profile);
+        setIsHost(space.created_by === user.id);
+      }
+    } catch (error) {
+      console.error('Error getting current user:', error);
     }
   };
 
@@ -75,16 +83,19 @@ export default function VartalaapRoom({ space, onLeave }: SpaceRoomProps) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        await supabase
+        const { error } = await supabase
           .from('space_members')
           .update({ is_muted: !isMuted })
           .eq('space_id', space.id)
           .eq('user_id', user.id);
+        
+        if (error) throw error;
       }
       setIsMuted(!isMuted);
       toast.success(isMuted ? 'Microphone on' : 'Microphone off');
     } catch (error) {
       console.error('Error toggling mute:', error);
+      toast.error('Failed to toggle microphone');
     }
   };
 
@@ -92,16 +103,19 @@ export default function VartalaapRoom({ space, onLeave }: SpaceRoomProps) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        await supabase
+        const { error } = await supabase
           .from('space_members')
           .update({ hand_raised: !handRaised })
           .eq('space_id', space.id)
           .eq('user_id', user.id);
+        
+        if (error) throw error;
       }
       setHandRaised(!handRaised);
       toast.success(handRaised ? 'Hand lowered' : 'Hand raised');
     } catch (error) {
       console.error('Error toggling hand raise:', error);
+      toast.error('Failed to toggle hand raise');
     }
   };
 

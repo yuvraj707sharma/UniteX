@@ -111,10 +111,28 @@ export default function AboutPage({ onBack }: AboutPageProps) {
         <div className="text-center pt-4 space-y-2">
           <p className="text-muted-foreground text-sm">Version 1.0.0</p>
           <div className="flex justify-center gap-4 text-sm">
-            <button className="dark:text-blue-400 light:text-red-600 hover:underline">
+            <button 
+              onClick={() => {
+                try {
+                  console.log('Terms of Service clicked');
+                } catch (error) {
+                  console.error('Error opening Terms of Service:', error);
+                }
+              }}
+              className="dark:text-blue-400 light:text-red-600 hover:underline"
+            >
               Terms of Service
             </button>
-            <button className="dark:text-blue-400 light:text-red-600 hover:underline">
+            <button 
+              onClick={() => {
+                try {
+                  console.log('Privacy Policy clicked');
+                } catch (error) {
+                  console.error('Error opening Privacy Policy:', error);
+                }
+              }}
+              className="dark:text-blue-400 light:text-red-600 hover:underline"
+            >
               Privacy Policy
             </button>
           </div>

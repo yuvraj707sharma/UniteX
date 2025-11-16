@@ -20,8 +20,13 @@ export default function LoginScreen({ onLogin, onNeedsOnboarding }: LoginScreenP
 
 
   const isValidUniversityEmail = (email: string): boolean => {
-    const validDomains = ['@jecrcu.edu.in', '.edu', '.ac.', '.edu.'];
-    return validDomains.some(domain => email.toLowerCase().includes(domain));
+    try {
+      const validDomains = ['@jecrcu.edu.in', '.edu', '.ac.', '.edu.'];
+      return validDomains.some(domain => email.toLowerCase().includes(domain));
+    } catch (error) {
+      console.error('Error validating university email:', error);
+      return false;
+    }
   };
 
   const handleLogin = async () => {

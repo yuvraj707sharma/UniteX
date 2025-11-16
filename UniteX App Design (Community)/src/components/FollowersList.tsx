@@ -43,16 +43,22 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
       if (!user) return;
 
       // Get current user profile
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single();
 
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+        toast.error('Failed to load profile');
+        return;
+      }
+
       setCurrentUser(profile);
 
       // Fetch followers
-      const { data: followersData } = await supabase
+      const { data: followersData, error: followersError } = await supabase
         .from('follows')
         .select(`
           follower_id,
@@ -60,14 +66,24 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
         `)
         .eq('followed_id', user.id);
 
+      if (followersError) {
+        console.error('Error fetching followers:', followersError);
+        toast.error('Failed to load followers');
+      }
+
       // Fetch following
-      const { data: followingData } = await supabase
+      const { data: followingData, error: followingError } = await supabase
         .from('follows')
         .select(`
           followed_id,
           profiles!follows_followed_id_fkey(id, full_name, username, department, bio, avatar_url)
         `)
         .eq('follower_id', user.id);
+
+      if (followingError) {
+        console.error('Error fetching following:', followingError);
+        toast.error('Failed to load following');
+      }
 
       const formattedFollowers = followersData?.map(f => ({
         name: f.profiles.full_name || 'Unknown',

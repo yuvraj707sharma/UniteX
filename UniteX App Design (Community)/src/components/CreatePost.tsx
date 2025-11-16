@@ -137,9 +137,9 @@ export default function CreatePost({ onClose, onPostCreated, currentUser }: Crea
         <div className="p-4">
           <div className="flex gap-3">
             <Avatar className="w-12 h-12">
-              <AvatarImage src={currentUser?.avatar} />
+              <AvatarImage src={currentUser?.avatar && /^https?:\/\//.test(currentUser.avatar) ? currentUser.avatar : undefined} />
               <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black">
-                {currentUser?.name?.charAt(0) || 'U'}
+                {currentUser?.name?.charAt(0)?.toUpperCase() || 'U'}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1">
@@ -158,21 +158,40 @@ export default function CreatePost({ onClose, onPostCreated, currentUser }: Crea
         {mediaPreview.length > 0 && (
           <div className="px-4 pb-4">
             <div className="grid grid-cols-2 gap-2">
-              {mediaPreview.map((preview, index) => (
-                <div key={index} className="relative">
-                  {selectedMedia[index]?.type.startsWith('image/') ? (
-                    <img src={preview} alt="Preview" className="w-full h-24 object-cover rounded-lg" />
-                  ) : (
-                    <video src={preview} className="w-full h-24 object-cover rounded-lg" />
-                  )}
-                  <button
-                    onClick={() => removeMedia(index)}
-                    className="absolute top-1 right-1 w-6 h-6 bg-black/50 text-white rounded-full flex items-center justify-center text-sm"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
+              {mediaPreview.map((preview, index) => {
+                // Validate data URL format to prevent XSS
+                const isValidDataUrl = /^data:(image|video)\/[a-zA-Z0-9+\.-]+;base64,[A-Za-z0-9+\/=]+$/.test(preview);
+                if (!isValidDataUrl) return null;
+                
+                return (
+                  <div key={index} className="relative">
+                    {selectedMedia[index]?.type.startsWith('image/') ? (
+                      <img 
+                        src={preview} 
+                        alt="Preview" 
+                        className="w-full h-24 object-cover rounded-lg"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <video 
+                        src={preview} 
+                        className="w-full h-24 object-cover rounded-lg"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    )}
+                    <button
+                      onClick={() => removeMedia(index)}
+                      className="absolute top-1 right-1 w-6 h-6 bg-black/50 text-white rounded-full flex items-center justify-center text-sm"
+                    >
+                      ×
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

@@ -227,7 +227,7 @@ export default function Messages({ initialChat, onClearUnread, onChatStateChange
             <Avatar className="w-12 h-12 flex-shrink-0">
               <AvatarImage src={chat.avatar} />
               <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black">
-                {chat.name.charAt(0)}
+                {chat.name?.charAt(0) || 'U'}
               </AvatarFallback>
             </Avatar>
 
@@ -312,7 +312,7 @@ export default function Messages({ initialChat, onClearUnread, onChatStateChange
                   <Avatar className="w-10 h-10">
                     <AvatarImage src={user.avatar_url} />
                     <AvatarFallback className="dark:bg-zinc-800 dark:text-white light:bg-gray-200 light:text-black">
-                      {user.full_name.charAt(0)}
+                      {user.full_name?.charAt(0) || 'U'}
                     </AvatarFallback>
                   </Avatar>
                   <div className="text-left flex-1">

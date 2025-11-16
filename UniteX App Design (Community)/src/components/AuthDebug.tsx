@@ -7,16 +7,28 @@ export default function AuthDebug() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setAuthState(session);
-      
-      if (session?.user) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-        setProfile(profileData);
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) {
+          console.error('Session error:', sessionError);
+          return;
+        }
+        setAuthState(session);
+        
+        if (session?.user) {
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+          if (profileError) {
+            console.error('Profile error:', profileError);
+          } else {
+            setProfile(profileData);
+          }
+        }
+      } catch (error) {
+        console.error('Auth debug error:', error);
       }
     };
     

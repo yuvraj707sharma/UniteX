@@ -53,7 +53,7 @@ export default function HomeFeed({
     const subscription = supabase
       .channel('posts_channel')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, (payload) => {
-        console.log('New post detected:', payload);
+        console.log('New post detected:', JSON.stringify(payload).replace(/[\r\n]/g, ''));
         fetchPosts(); // Refresh posts when new one is added
       })
       .subscribe();
@@ -111,10 +111,19 @@ export default function HomeFeed({
         .order('created_at', { ascending: false })
         .range(pageNum * POSTS_PER_PAGE, (pageNum + 1) * POSTS_PER_PAGE - 1);
 
-      console.log('Raw posts data:', { postsData, postsError, count: postsData?.length });
+      const sanitizedPostsDataForLog = postsData?.map(post => ({
+        id: post.id,
+        author_id: post.author_id,
+        content: post.content?.replace(/[\r\n\t]/g, ' ').substring(0, 100)
+      }));
+      console.log('Raw posts data:', { postsData: sanitizedPostsDataForLog, postsError, count: postsData?.length });
       
       if (postsError) {
-        console.error('Supabase error:', postsError);
+        const sanitizedError = {
+          code: postsError.code,
+          message: postsError.message?.replace(/[\r\n\t]/g, ' ').substring(0, 200)
+        };
+        console.error('Supabase error:', sanitizedError);
         throw postsError;
       }
 
@@ -133,10 +142,19 @@ export default function HomeFeed({
         .select('id, full_name, username, department, avatar_url')
         .in('id', authorIds);
 
-      console.log('Profiles data:', { profilesData, profilesError });
+      const sanitizedProfilesForLog = profilesData?.map(profile => ({
+        id: profile.id,
+        full_name: profile.full_name?.replace(/[\r\n\t]/g, ' ').substring(0, 50),
+        username: profile.username?.replace(/[\r\n\t]/g, ' ').substring(0, 30)
+      }));
+      console.log('Profiles data:', { profilesData: sanitizedProfilesForLog, profilesError });
 
       if (profilesError) {
-        console.error('Profiles error:', profilesError);
+        const sanitizedError = {
+          code: profilesError.code,
+          message: profilesError.message?.replace(/[\r\n\t]/g, ' ').substring(0, 200)
+        };
+        console.error('Profiles error:', sanitizedError);
       }
 
       // Create a map of profiles for easy lookup
@@ -145,21 +163,31 @@ export default function HomeFeed({
         profilesMap.set(profile.id, profile);
       });
 
-      // Fetch reposts count for all posts
+      // Fetch reposts count for all posts in a single query
       const postIds = postsData.map(post => post.id);
       const repostsMap = new Map();
       
-      for (const postId of postIds) {
-        const { count } = await supabase
+      if (postIds.length > 0) {
+        const { data: repostsData } = await supabase
           .from('reposts')
-          .select('*', { count: 'exact', head: true })
-          .eq('post_id', postId);
-        repostsMap.set(postId, count || 0);
+          .select('post_id')
+          .in('post_id', postIds);
+        
+        // Count reposts per post
+        repostsData?.forEach(repost => {
+          const currentCount = repostsMap.get(repost.post_id) || 0;
+          repostsMap.set(repost.post_id, currentCount + 1);
+        });
       }
 
       const formattedPosts = postsData.map(post => {
         const profile = profilesMap.get(post.author_id);
-        console.log('Processing post:', post.id, 'Author ID:', post.author_id, 'Profile:', profile);
+        const sanitizedProfile = profile ? {
+          id: profile.id,
+          full_name: profile.full_name?.replace(/[\r\n\t]/g, ' ').substring(0, 100),
+          username: profile.username?.replace(/[\r\n\t]/g, ' ').substring(0, 50)
+        } : null;
+        console.log('Processing post:', post.id, 'Author ID:', post.author_id, 'Profile:', JSON.stringify(sanitizedProfile));
         
         // Better time formatting
         let timeAgo = 'Unknown';
@@ -203,7 +231,13 @@ export default function HomeFeed({
         };
       });
 
-      console.log('Formatted posts:', formattedPosts.length, formattedPosts);
+      const sanitizedPostsForLog = formattedPosts.map(post => ({
+        id: post.id,
+        author: post.author?.replace(/[\r\n\t]/g, ' ').substring(0, 50),
+        username: post.username?.replace(/[\r\n\t]/g, ' ').substring(0, 30),
+        content: post.content?.replace(/[\r\n\t]/g, ' ').substring(0, 100)
+      }));
+      console.log('Formatted posts:', formattedPosts.length, sanitizedPostsForLog);
 
       if (append) {
         setPosts(prev => [...prev, ...formattedPosts]);

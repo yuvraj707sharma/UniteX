@@ -290,19 +290,6 @@ export default function PostCard({
           console.error('Error updating likes_count:', updateError);
         }
       }
-      
-      // Fetch updated count from database to ensure accuracy
-      setTimeout(async () => {
-        const { data } = await supabase
-          .from('posts')
-          .select('likes_count')
-          .eq('id', id)
-          .single();
-        
-        if (data) {
-          setLikes(data.likes_count || 0);
-        }
-      }, 500);
     } catch (error) {
       console.error('Error liking post:', error);
       console.error('Full error object:', JSON.stringify(error, null, 2));
@@ -380,19 +367,6 @@ export default function PostCard({
       setComments(newCommentCount);
       setCommentText("");
       toast.success("Comment posted!");
-      
-      // Fetch updated count from database to ensure accuracy
-      setTimeout(async () => {
-        const { data } = await supabase
-          .from('posts')
-          .select('comments_count')
-          .eq('id', id)
-          .single();
-        
-        if (data) {
-          setComments(data.comments_count || 0);
-        }
-      }, 500);
     } catch (error) {
       console.error('Error posting comment:', error);
       toast.error('Failed to post comment');

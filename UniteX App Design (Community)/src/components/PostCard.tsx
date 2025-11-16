@@ -71,6 +71,7 @@ export default function PostCard({
     fetchRealUsers();
     fetchLikeStatus();
     fetchBookmarkStatus();
+    fetchActualLikeCount();
   }, []);
 
   useEffect(() => {
@@ -224,6 +225,26 @@ export default function PostCard({
     }
   };
 
+  const fetchActualLikeCount = async () => {
+    try {
+      if (!id) return;
+      
+      const { count, error } = await supabase
+        .from('post_likes')
+        .select('*', { count: 'exact', head: true })
+        .eq('post_id', id);
+      
+      if (error) {
+        console.error('Error fetching like count:', error);
+        return;
+      }
+      
+      setLikes(count || 0);
+    } catch (error) {
+      console.error('Error in fetchActualLikeCount:', error);
+    }
+  };
+
   const handleLike = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -245,13 +266,14 @@ export default function PostCard({
         }
         
         setLiked(false);
-        setLikes(likes - 1);
+        const newLikeCount = Math.max(0, likes - 1);
+        setLikes(newLikeCount);
         toast.success("Unliked!");
         
         // Update the post's like count in database
         const { error: updateError } = await supabase
           .from('posts')
-          .update({ likes_count: Math.max(0, likes - 1) })
+          .update({ likes_count: newLikeCount })
           .eq('id', id);
         
         if (updateError) {

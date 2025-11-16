@@ -39,14 +39,14 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
 
   const fetchFollowData = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) return;
 
       // Get current user profile
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', user.id)
+        .eq('id', authUser.id)
         .single();
 
       if (profileError) {
@@ -64,7 +64,7 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
           follower_id,
           profiles!follows_follower_id_fkey(id, full_name, username, department, bio, avatar_url)
         `)
-        .eq('followed_id', user.id);
+        .eq('followed_id', authUser.id);
 
       if (followersError) {
         console.error('Error fetching followers:', followersError);
@@ -78,7 +78,7 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
           followed_id,
           profiles!follows_followed_id_fkey(id, full_name, username, department, bio, avatar_url)
         `)
-        .eq('follower_id', user.id);
+        .eq('follower_id', authUser.id);
 
       if (followingError) {
         console.error('Error fetching following:', followingError);
@@ -116,17 +116,21 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
 
   const handleFollowToggle = async (username: string, type: "followers" | "following") => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) {
+        toast.error('Please log in to follow users');
+        return;
+      }
 
       // Get the target user's profile
-      const { data: targetProfile } = await supabase
+      const { data: targetProfile, error: profileError } = await supabase
         .from('profiles')
         .select('id')
         .eq('username', username)
         .single();
 
-      if (!targetProfile) {
+      if (profileError || !targetProfile) {
+        console.error('Error finding user profile:', profileError);
         toast.error('User not found');
         return;
       }
@@ -134,7 +138,10 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
       // Find the user in the current list to determine current state
       const userList = type === "followers" ? followers : following;
       const targetUser = userList.find(u => u.username === username);
-      if (!targetUser) return;
+      if (!targetUser) {
+        toast.error('User not found in list');
+        return;
+      }
 
       const wasFollowing = targetUser.isFollowing;
 
@@ -163,7 +170,7 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
         const { error } = await supabase
           .from('follows')
           .delete()
-          .eq('follower_id', user.id)
+          .eq('follower_id', authUser.id)
           .eq('followed_id', targetProfile.id);
         
         if (error) {
@@ -182,7 +189,7 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
         const { error } = await supabase
           .from('follows')
           .insert({
-            follower_id: user.id,
+            follower_id: authUser.id,
             followed_id: targetProfile.id
           });
         
@@ -201,16 +208,21 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
     } catch (error: any) {
       console.error('Error toggling follow:', error);
       
+      // Find the user again to get the original state for revert
+      const userList = type === "followers" ? followers : following;
+      const targetUser = userList.find(u => u.username === username);
+      const originalFollowState = targetUser ? !targetUser.isFollowing : false; // Revert to opposite of current
+      
       // Provide specific error messages
       const errorMessage = error?.message || 'Unknown error occurred';
-      toast.error(`Failed to ${wasFollowing ? 'unfollow' : 'follow'}: ${errorMessage}`);
+      toast.error(`Failed to ${originalFollowState ? 'follow' : 'unfollow'}: ${errorMessage}`);
       
-      // Revert optimistic update on error using the original state
+      // Revert optimistic update on error
       if (type === "followers") {
         setFollowers(
           followers.map((user) =>
             user.username === username
-              ? { ...user, isFollowing: wasFollowing }
+              ? { ...user, isFollowing: originalFollowState }
               : user
           )
         );
@@ -218,7 +230,7 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
         setFollowing(
           following.map((user) =>
             user.username === username
-              ? { ...user, isFollowing: wasFollowing }
+              ? { ...user, isFollowing: originalFollowState }
               : user
           )
         );
@@ -325,11 +337,31 @@ export default function FollowersList({ onBack, onNavigateToProfile, initialTab 
         </div>
 
         <TabsContent value="followers" className="m-0">
-          {renderUserList(followers, "followers")}
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="text-muted-foreground">Loading followers...</div>
+            </div>
+          ) : followers.length > 0 ? (
+            renderUserList(followers, "followers")
+          ) : (
+            <div className="text-center py-8">
+              <div className="text-muted-foreground">No followers yet</div>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="following" className="m-0">
-          {renderUserList(following, "following")}
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="text-muted-foreground">Loading following...</div>
+            </div>
+          ) : following.length > 0 ? (
+            renderUserList(following, "following")
+          ) : (
+            <div className="text-center py-8">
+              <div className="text-muted-foreground">Not following anyone yet</div>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

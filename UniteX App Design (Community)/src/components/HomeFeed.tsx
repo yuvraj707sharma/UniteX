@@ -3,6 +3,8 @@ import { Settings, Plus } from "lucide-react";
 import PostCard from "./PostCard";
 import ProfileMenu from "./ProfileMenu";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { Spinner } from "./ui/spinner";
+import { PostSkeletonList } from "./ui/post-skeleton";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { supabase } from "../lib/supabase";
@@ -40,6 +42,7 @@ export default function HomeFeed({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
   const [isPulling, setIsPulling] = useState(false);
+  const [usePersonalizedFeed, setUsePersonalizedFeed] = useState(true);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef(0);
@@ -76,6 +79,7 @@ export default function HomeFeed({
 
       if (profile) {
         setCurrentUser({
+          id: user.id,
           avatar: profile.avatar_url || '',
           name: profile.full_name || 'User'
         });
@@ -92,69 +96,101 @@ export default function HomeFeed({
 
       const POSTS_PER_PAGE = 10;
       
-      // First, let's check the current user
+      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
-      console.log('Current user:', user?.id);
       
-      // Get total count of posts
-      const { count: totalCount, error: countError } = await supabase
-        .from('posts')
-        .select('*', { count: 'exact', head: true });
-      
-      console.log('Total posts in database:', totalCount, 'Error:', countError);
-      setTotalPostsCount(totalCount);
-      
-      // Try fetching posts without profiles first to debug
-      const { data: postsData, error: postsError } = await supabase
-        .from('posts')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .range(pageNum * POSTS_PER_PAGE, (pageNum + 1) * POSTS_PER_PAGE - 1);
-
-      const sanitizedPostsDataForLog = postsData?.map(post => ({
-        id: post.id,
-        author_id: post.author_id,
-        content: post.content?.replace(/[\r\n\t]/g, ' ').substring(0, 100)
-      }));
-      console.log('Raw posts data:', { postsData: sanitizedPostsDataForLog, postsError, count: postsData?.length });
-      
-      if (postsError) {
-        const sanitizedError = {
-          code: postsError.code,
-          message: postsError.message?.replace(/[\r\n\t]/g, ' ').substring(0, 200)
-        };
-        console.error('Supabase error:', sanitizedError);
-        throw postsError;
-      }
-
-      if (!postsData || postsData.length === 0) {
-        console.log('No posts found in database');
+      if (!user) {
+        console.error('No authenticated user');
         setPosts([]);
         setLoading(false);
         setLoadingMore(false);
         return;
       }
 
-      // Now fetch profiles for these posts
+      console.log('Current user:', user.id);
+      
+      let postsData: any[] = [];
+      
+      // Try to use personalized feed if available
+      if (usePersonalizedFeed) {
+        try {
+          // Call the personalized feed function
+          const { data: personalizedPosts, error: feedError } = await supabase
+            .rpc('get_personalized_feed', {
+              p_user_id: user.id,
+              p_limit: POSTS_PER_PAGE,
+              p_offset: pageNum * POSTS_PER_PAGE
+            });
+
+          if (feedError) {
+            console.warn('Personalized feed not available, falling back to chronological:', feedError.message);
+            // Fall back to chronological feed
+            setUsePersonalizedFeed(false);
+          } else if (personalizedPosts && personalizedPosts.length > 0) {
+            console.log('Using personalized feed, got', personalizedPosts.length, 'posts');
+            postsData = personalizedPosts.map((p: any) => ({
+              id: p.post_id,
+              author_id: p.author_id,
+              content: p.content,
+              media_urls: p.media_urls,
+              likes_count: p.likes_count || 0,
+              comments_count: p.comments_count || 0,
+              shares_count: p.shares_count || 0,
+              created_at: p.created_at,
+              relevance_score: p.relevance_score,
+              score_breakdown: p.score_breakdown
+            }));
+            
+            // Track post views for the algorithm
+            personalizedPosts.forEach((post: any) => {
+              trackInteraction(user.id, post.post_id, 'view');
+            });
+          } else {
+            // No personalized posts yet, fall back to chronological
+            console.log('No personalized posts available yet, falling back to chronological');
+            setUsePersonalizedFeed(false);
+          }
+        } catch (rpcError) {
+          console.warn('RPC call failed, falling back to chronological feed:', rpcError);
+          setUsePersonalizedFeed(false);
+        }
+      }
+      
+      // Fallback to chronological feed if personalized feed is not available
+      if (!usePersonalizedFeed || postsData.length === 0) {
+        const { data: chronologicalPosts, error: postsError } = await supabase
+          .from('posts')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(pageNum * POSTS_PER_PAGE, (pageNum + 1) * POSTS_PER_PAGE - 1);
+
+        if (postsError) {
+          console.error('Error fetching chronological posts:', postsError);
+          throw postsError;
+        }
+
+        postsData = chronologicalPosts || [];
+        console.log('Using chronological feed, got', postsData.length, 'posts');
+      }
+
+      if (!postsData || postsData.length === 0) {
+        console.log('No posts found');
+        if (!append) setPosts([]);
+        setHasMore(false);
+        setLoading(false);
+        setLoadingMore(false);
+        return;
+      }
+
+      // Fetch profiles for these posts
       const authorIds = postsData.map(post => post.author_id);
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('id, full_name, username, department, avatar_url')
         .in('id', authorIds);
 
-      const sanitizedProfilesForLog = profilesData?.map(profile => ({
-        id: profile.id,
-        full_name: profile.full_name?.replace(/[\r\n\t]/g, ' ').substring(0, 50),
-        username: profile.username?.replace(/[\r\n\t]/g, ' ').substring(0, 30)
-      }));
-      console.log('Profiles data:', { profilesData: sanitizedProfilesForLog, profilesError });
-
       if (profilesError) {
-        const sanitizedError = {
-          code: profilesError.code,
-          message: profilesError.message?.replace(/[\r\n\t]/g, ' ').substring(0, 200)
-        };
-        console.error('Profiles error:', sanitizedError);
+        console.error('Error fetching profiles:', profilesError);
       }
 
       // Create a map of profiles for easy lookup
@@ -182,12 +218,6 @@ export default function HomeFeed({
 
       const formattedPosts = postsData.map(post => {
         const profile = profilesMap.get(post.author_id);
-        const sanitizedProfile = profile ? {
-          id: profile.id,
-          full_name: profile.full_name?.replace(/[\r\n\t]/g, ' ').substring(0, 100),
-          username: profile.username?.replace(/[\r\n\t]/g, ' ').substring(0, 50)
-        } : null;
-        console.log('Processing post:', post.id, 'Author ID:', post.author_id, 'Profile:', JSON.stringify(sanitizedProfile));
         
         // Better time formatting
         let timeAgo = 'Unknown';
@@ -227,17 +257,12 @@ export default function HomeFeed({
           reposts: repostsMap.get(post.id) || 0,
           timeAgo: timeAgo,
           avatar: profile?.avatar_url || '',
-          image: post.media_urls?.[0] || undefined
+          image: post.media_urls?.[0] || undefined,
+          // Include algorithm metadata if available
+          relevanceScore: post.relevance_score,
+          scoreBreakdown: post.score_breakdown
         };
       });
-
-      const sanitizedPostsForLog = formattedPosts.map(post => ({
-        id: post.id,
-        author: post.author?.replace(/[\r\n\t]/g, ' ').substring(0, 50),
-        username: post.username?.replace(/[\r\n\t]/g, ' ').substring(0, 30),
-        content: post.content?.replace(/[\r\n\t]/g, ' ').substring(0, 100)
-      }));
-      console.log('Formatted posts:', formattedPosts.length, sanitizedPostsForLog);
 
       if (append) {
         setPosts(prev => [...prev, ...formattedPosts]);
@@ -252,6 +277,22 @@ export default function HomeFeed({
     } finally {
       setLoading(false);
       setLoadingMore(false);
+    }
+  };
+
+  // Track user interactions for the feed algorithm
+  const trackInteraction = async (userId: string, postId: string, interactionType: string) => {
+    try {
+      await supabase
+        .from('post_interactions')
+        .insert({
+          user_id: userId,
+          post_id: postId,
+          interaction_type: interactionType
+        });
+    } catch (error) {
+      // Silently fail - interaction tracking is non-critical
+      console.debug('Failed to track interaction:', error);
     }
   };
 
@@ -323,7 +364,7 @@ export default function HomeFeed({
       onTouchMove={handleTouchMove} 
       onTouchEnd={handleTouchEnd}
     >
-      {/* Pull to Refresh Indicator */}
+      {/* Pull to Refresh Indicator - Modern Design */}
       {(isPulling || isRefreshing) && (
         <div 
           className="fixed top-0 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ease-out"
@@ -335,15 +376,17 @@ export default function HomeFeed({
           <div className="bg-background border border-border rounded-full px-4 py-2 shadow-lg flex items-center gap-2">
             {isRefreshing ? (
               <>
-                <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                <Spinner size="sm" variant="primary" />
                 <span className="text-sm text-foreground">Refreshing...</span>
               </>
             ) : (
               <>
                 <div 
-                  className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full transition-transform"
+                  className="transition-transform"
                   style={{ transform: `rotate(${pullDistance * 3}deg)` }}
-                ></div>
+                >
+                  <Spinner size="sm" variant="primary" className="animate-none" />
+                </div>
                 <span className="text-sm text-foreground">
                   {pullDistance > 80 ? 'Release to refresh' : 'Pull to refresh'}
                 </span>
@@ -391,8 +434,8 @@ export default function HomeFeed({
 
       {/* Feed */}
       {loading ? (
-        <div className="flex items-center justify-center py-8">
-          <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full"></div>
+        <div className="animate-in fade-in duration-300">
+          <PostSkeletonList count={5} />
         </div>
       ) : posts.length === 0 ? (
         <div className="flex items-center justify-center h-96">
@@ -433,7 +476,7 @@ export default function HomeFeed({
           ))}
           {loadingMore && (
             <div className="flex items-center justify-center py-4">
-              <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full"></div>
+              <Spinner size="md" variant="primary" />
             </div>
           )}
           {!hasMore && posts.length > 0 && (

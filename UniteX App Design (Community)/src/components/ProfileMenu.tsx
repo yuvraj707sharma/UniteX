@@ -69,7 +69,7 @@ export default function ProfileMenu({
         const { data: followers } = await supabase
           .from('follows')
           .select('id')
-          .eq('followed_id', user.id);
+          .eq('following_id', user.id);
 
         const { data: following } = await supabase
           .from('follows')

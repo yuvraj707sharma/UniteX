@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-8">
+    <h1>Theme Debug Test</h1>
+    
+    <!-- Test buttons -->
+    <div class="space-y-4">
+        <button class="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-orange-600 dark:hover:bg-orange-700 text-white rounded">
+            Standard Tailwind Button
+        </button>
+        
+        <button class="px-4 py-2 bg-primary text-primary-foreground rounded">
+            CSS Variable Button
+        </button>
+    </div>
+    
+    <!-- Theme toggle -->
+    <button onclick="toggleTheme()" class="mt-4 px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded">
+        Toggle Theme
+    </button>
+    
+    <script>
+        function toggleTheme() {
+            document.documentElement.classList.toggle('dark');
+        }
+    </script>
+</body>
+</html>

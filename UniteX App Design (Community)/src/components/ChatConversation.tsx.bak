@@ -158,63 +158,22 @@ export default function ChatConversation({ onBack, user, onClearUnread }: ChatCo
         throw error;
       }
 
-      // Get signed URLs for media
-      const formattedMessages = await Promise.all((data || []).map(async (msg: any) => {
-        let imageUrl = msg.image_url;
-        let videoUrl = msg.video_url;
-        let audioUrl = msg.audio_url;
-
-        // Get signed URLs for private storage
-        if (imageUrl && !imageUrl.startsWith('blob:')) {
-          try {
-            const { data: signedData } = await supabase.storage
-              .from('message-media')
-              .createSignedUrl(imageUrl, 3600); // 1 hour expiry
-            if (signedData) imageUrl = signedData.signedUrl;
-          } catch (err) {
-            console.error('Error getting signed URL for image:', err);
-          }
-        }
-
-        if (videoUrl && !videoUrl.startsWith('blob:')) {
-          try {
-            const { data: signedData } = await supabase.storage
-              .from('message-media')
-              .createSignedUrl(videoUrl, 3600);
-            if (signedData) videoUrl = signedData.signedUrl;
-          } catch (err) {
-            console.error('Error getting signed URL for video:', err);
-          }
-        }
-
-        if (audioUrl && !audioUrl.startsWith('blob:')) {
-          try {
-            const { data: signedData } = await supabase.storage
-              .from('audio-messages')
-              .createSignedUrl(audioUrl, 3600);
-            if (signedData) audioUrl = signedData.signedUrl;
-          } catch (err) {
-            console.error('Error getting signed URL for audio:', err);
-          }
-        }
-
-        return {
-          id: msg.id,
-          text: msg.content,
-          timestamp: new Date(msg.created_at).toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit'
-          }),
-          isSent: msg.sender_id === currentUser.id,
-          status: msg.is_read ? 'read' : 'delivered',
-          image: imageUrl,
-          video: videoUrl,
-          audio: audioUrl,
-          audioDuration: msg.audio_duration,
-          audioWaveform: msg.audio_waveform,
-          uploadStatus: msg.upload_status
-        };
-      }));
+      const formattedMessages = data?.map((msg: any) => ({
+        id: msg.id,
+        text: msg.content,
+        timestamp: new Date(msg.created_at).toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit'
+        }),
+        isSent: msg.sender_id === currentUser.id,
+        status: msg.is_read ? 'read' : 'delivered',
+        image: msg.image_url,
+        video: msg.video_url,
+        audio: msg.audio_url,
+        audioDuration: msg.audio_duration,
+        audioWaveform: msg.audio_waveform,
+        uploadStatus: msg.upload_status
+      })) || [];
 
       setMessages(formattedMessages);
     } catch (error) {
@@ -229,12 +188,6 @@ export default function ChatConversation({ onBack, user, onClearUnread }: ChatCo
     try {
       const file = event.target.files?.[0];
       if (!file) return;
-
-      // Check file size (20MB limit)
-      if (file.size > 20 * 1024 * 1024) {
-        toast.error('File too large. Maximum size is 20MB.');
-        return;
-      }
 
       const fileType = file.type.startsWith("image") ? "image" : "video";
       const fileURL = URL.createObjectURL(file);
@@ -255,38 +208,15 @@ export default function ChatConversation({ onBack, user, onClearUnread }: ChatCo
     }
   };
 
-  const uploadMediaToStorage = async (file: File, type: 'image' | 'video'): Promise<string | null> => {
-    try {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (!currentUser) return null;
-
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${currentUser.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-      const { data, error } = await supabase.storage
-        .from('message-media')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (error) {
-        console.error('Upload error:', error);
-        throw error;
-      }
-
-      // Return the storage path (not public URL since bucket is private)
-      return data.path;
-    } catch (error) {
-      console.error('Error uploading media:', error);
-      return null;
-    }
-  };
-
   const handleSendMessage = async () => {
     if (!inputText.trim() && !selectedMedia && !showAudioRecorder) return;
 
     try {
+      const messageContent = selectedMedia 
+        ? `${selectedMedia.type === "image" ? "📷 Photo" : "🎥 Video"}${inputText ? `: ${inputText}` : ""}`
+        : inputText;
+
+      // Get the receiver's profile to get their user ID
       const { data: receiverProfile, error: profileError } = await supabase
         .from('profiles')
         .select('id')
@@ -304,29 +234,6 @@ export default function ChatConversation({ onBack, user, onClearUnread }: ChatCo
         return;
       }
 
-      let imageUrl = null;
-      let videoUrl = null;
-      let messageContent = inputText;
-
-      // Upload media to Supabase Storage
-      if (selectedMedia) {
-        toast.info('Uploading media...');
-        const uploadedPath = await uploadMediaToStorage(selectedMedia.file, selectedMedia.type);
-        
-        if (!uploadedPath) {
-          toast.error('Failed to upload media');
-          return;
-        }
-
-        if (selectedMedia.type === 'image') {
-          imageUrl = uploadedPath;
-          messageContent = inputText || '📷 Photo';
-        } else {
-          videoUrl = uploadedPath;
-          messageContent = inputText || '🎥 Video';
-        }
-      }
-
       const { error } = await supabase
         .from('messages')
         .insert({
@@ -334,8 +241,8 @@ export default function ChatConversation({ onBack, user, onClearUnread }: ChatCo
           receiver_id: receiverProfile.id,
           content: messageContent,
           message_type: selectedMedia ? selectedMedia.type : 'text',
-          image_url: imageUrl,
-          video_url: videoUrl
+          image_url: selectedMedia?.type === 'image' ? selectedMedia.url : null,
+          video_url: selectedMedia?.type === 'video' ? selectedMedia.url : null
         });
 
       if (error) throw error;
@@ -343,71 +250,11 @@ export default function ChatConversation({ onBack, user, onClearUnread }: ChatCo
       setInputText("");
       setSelectedMedia(null);
       setShowAudioRecorder(false);
-      fetchMessages();
+      fetchMessages(); // Refresh messages
       toast.success('Message sent!');
     } catch (error) {
       console.error('Error sending message:', error);
       toast.error('Failed to send message');
-    }
-  };
-
-  const handleSendAudio = async (audioBlob: Blob, duration: number, waveform: number[]) => {
-    try {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (!currentUser) {
-        throw new Error('Not authenticated');
-      }
-
-      const { data: receiverProfile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('username', user.username)
-        .single();
-
-      if (profileError || !receiverProfile) {
-        throw new Error('Failed to find user');
-      }
-
-      // Upload audio to Supabase Storage
-      const fileExt = 'webm';
-      const fileName = `${currentUser.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('audio-messages')
-        .upload(fileName, audioBlob, {
-          contentType: 'audio/webm',
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) {
-        console.error('Audio upload error:', uploadError);
-        throw uploadError;
-      }
-
-      // Insert message with audio
-      const { error: insertError } = await supabase
-        .from('messages')
-        .insert({
-          sender_id: currentUserId,
-          receiver_id: receiverProfile.id,
-          content: '🎙️ Voice message',
-          message_type: 'audio',
-          audio_url: uploadData.path,
-          audio_duration: duration,
-          audio_waveform: waveform,
-          upload_status: 'completed'
-        });
-
-      if (insertError) throw insertError;
-
-      setShowAudioRecorder(false);
-      fetchMessages();
-      toast.success('Audio message sent!');
-    } catch (error) {
-      console.error('Error sending audio:', error);
-      toast.error('Failed to send audio message');
-      throw error;
     }
   };
 
@@ -490,71 +337,58 @@ export default function ChatConversation({ onBack, user, onClearUnread }: ChatCo
             className={`flex ${message.isSent ? "justify-end" : "justify-start"}`}
           >
             <div className={`max-w-[75%]`}>
-              {/* Image */}
-              {message.image && !message.audio && (
+              {/* Image or Video */}
+              {(message.image || message.video) && (
                 <div className="mb-2 rounded-2xl overflow-hidden">
-                  <img
-                    src={message.image}
-                    alt="Shared"
-                    className="max-w-full h-auto max-h-[300px] object-cover"
-                    onError={(e) => {
-                      console.error('Image load error:', message.image);
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
+                  {message.image && (
+                    <img
+                      src={message.image}
+                      alt="Shared"
+                      className="max-w-full h-auto max-h-[300px] object-cover"
+                    />
+                  )}
+                  {message.video && (
+                    <video
+                      src={message.video}
+                      controls
+                      className="max-w-full h-auto max-h-[300px]"
+                    />
+                  )}
                 </div>
               )}
-              
-              {/* Video */}
-              {message.video && !message.audio && (
-                <div className="mb-2 rounded-2xl overflow-hidden">
-                  <video
-                    src={message.video}
-                    controls
-                    className="max-w-full h-auto max-h-[300px]"
-                    onError={(e) => {
-                      console.error('Video load error:', message.video);
-                    }}
-                  />
-                </div>
-              )}
-
               {/* Audio */}
               {message.audio && (
                 <AudioMessage
                   audioUrl={message.audio}
                   audioDuration={message.audioDuration}
                   audioWaveform={message.audioWaveform}
-                  isSent={message.isSent}
                 />
               )}
               
-              {/* Text Message (only show if not media-only with emoji text) */}
-              {!message.audio && message.text && message.text !== '📷 Photo' && message.text !== '🎥 Video' && (
-                <div
-                  className={`${
-                    message.isSent
-                      ? "dark:bg-blue-500 light:bg-red-600 text-white"
-                      : "dark:bg-zinc-800 light:bg-gray-200 dark:text-white light:text-black"
-                  } rounded-2xl px-4 py-2`}
-                >
-                  <p className="break-words">{message.text}</p>
-                  <div className="flex items-center gap-1 justify-end mt-1">
-                    <span
-                      className={`text-xs ${
-                        message.isSent
-                          ? "text-white/70"
-                          : "dark:text-zinc-400 light:text-gray-500"
-                      }`}
-                    >
-                      {message.timestamp}
-                    </span>
-                    {message.isSent && (
-                      <span className="text-white/70">{getTickIcon(message.status)}</span>
-                    )}
-                  </div>
+              {/* Text Message */}
+              <div
+                className={`${
+                  message.isSent
+                    ? "dark:bg-blue-500 light:bg-red-600 text-white"
+                    : "dark:bg-zinc-800 light:bg-gray-200 dark:text-white light:text-black"
+                } rounded-2xl px-4 py-2`}
+              >
+                <p className="break-words">{message.text}</p>
+                <div className="flex items-center gap-1 justify-end mt-1">
+                  <span
+                    className={`text-xs ${
+                      message.isSent
+                        ? "text-white/70"
+                        : "dark:text-zinc-400 light:text-gray-500"
+                    }`}
+                  >
+                    {message.timestamp}
+                  </span>
+                  {message.isSent && (
+                    <span className="text-white/70">{getTickIcon(message.status)}</span>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           </motion.div>
           ))
@@ -593,11 +427,9 @@ export default function ChatConversation({ onBack, user, onClearUnread }: ChatCo
           </div>
         )}
         {showAudioRecorder && (
-          <AudioRecorder
-            onSend={handleSendAudio}
-            onCancel={() => setShowAudioRecorder(false)}
-            maxDuration={60}
-          />
+          <div className="mb-2">
+            <AudioRecorder />
+          </div>
         )}
         <div className="flex items-center gap-2">
           <input

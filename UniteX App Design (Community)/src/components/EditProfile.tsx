@@ -6,7 +6,7 @@ import { Textarea } from './ui/textarea'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { Badge } from './ui/badge'
 import { toast } from 'sonner'
-import { sanitizeHtml, sanitizeUsername, validateUrl } from '../utils/sanitize'
+import { sanitizeHtml, sanitizeText, sanitizeUsername, validateUrl } from '../utils/sanitize'
 import { supabase } from '../lib/supabase'
 
 interface EditProfileProps {
@@ -154,9 +154,9 @@ export default function EditProfile({ onBack, profile, onSave }: EditProfileProp
       const { error } = await supabase
         .from('profiles')
         .update({
-          full_name: sanitizeHtml(formData.name.trim()),
+          full_name: sanitizeText(formData.name.trim()),
           username: sanitizeUsername(formData.username.trim()),
-          bio: sanitizeHtml(formData.bio.trim()),
+          bio: sanitizeText(formData.bio.trim()),
           portfolio_url: formData.website.trim(),
           avatar_url: avatarUrl,
           skills: skills.map(skill => skill.trim())

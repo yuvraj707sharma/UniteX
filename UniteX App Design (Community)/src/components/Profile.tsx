@@ -8,22 +8,24 @@ import { motion } from "framer-motion";
 import PostCard from "./PostCard";
 import EditProfile from "./EditProfile";
 import { supabase } from "../lib/supabase";
+import { ProfileBadgesRow } from "./badges";
 
 interface ProfileProps {
   onNavigateToFollowers?: (tab: "followers" | "following", username: string, profileName: string) => void;
   onNavigateToSettings?: () => void;
+  onNavigateToBadges?: () => void;
 }
 
-
-
-export default function Profile({ onNavigateToFollowers, onNavigateToSettings }: ProfileProps) {
+export default function Profile({ onNavigateToFollowers, onNavigateToSettings, onNavigateToBadges }: ProfileProps) {
   const [showEditProfile, setShowEditProfile] = useState(false)
   const [profileData, setProfileData] = useState<any>(null)
   const [userPosts, setUserPosts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
     fetchUserProfile();
+    fetchCurrentUser();
   }, []);
 
   const fetchUserProfile = async () => {
@@ -53,12 +55,17 @@ export default function Profile({ onNavigateToFollowers, onNavigateToSettings }:
       const { data: followers } = await supabase
         .from('follows')
         .select('id')
-        .eq('followed_id', user.id);
+        .eq('following_id', user.id);
 
       const { data: following } = await supabase
         .from('follows')
         .select('id')
         .eq('follower_id', user.id);
+
+      console.log('Profile - Followers data:', followers);
+      console.log('Profile - Following data:', following);
+      console.log('Profile - Follower count:', followers?.length || 0);
+      console.log('Profile - Following count:', following?.length || 0);
 
       // Format profile data
       const formattedProfile = {
@@ -94,6 +101,15 @@ export default function Profile({ onNavigateToFollowers, onNavigateToSettings }:
       setLoading(false);
     }
   };
+
+  const fetchCurrentUser = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
+    } catch (error) {
+      console.error('Error fetching current user:', error);
+    }
+  }
 
   const getOrdinalSuffix = (num: number) => {
     const suffixes = ['th', 'st', 'nd', 'rd'];
@@ -270,6 +286,14 @@ export default function Profile({ onNavigateToFollowers, onNavigateToSettings }:
             ))}
           </div>
         </div>
+
+        {/* Badges Section */}
+        {currentUser?.id && (
+          <ProfileBadgesRow 
+            userId={currentUser.id} 
+            onViewAll={onNavigateToBadges}
+          />
+        )}
 
         {/* Posts & Projects Tabs */}
         <Tabs defaultValue="posts" className="w-full">

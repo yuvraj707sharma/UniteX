@@ -373,7 +373,48 @@ class NotificationService {
    */
   async requestPushPermissions(userId: string): Promise<boolean> {
     try {
-      // Check if running in a browser that supports notifications
+      // Check if we're running on Capacitor (mobile)
+      const isCapacitor = (window as any).Capacitor !== undefined;
+      
+      if (isCapacitor) {
+        console.log('📱 Running on Capacitor - Checking for notification support');
+        
+        // For Capacitor/Android, use the web Notification API as fallback
+        // The Android manifest permissions will handle the system-level permission
+        // The user will see the system dialog when they first interact with notifications
+        
+        if ('Notification' in window) {
+          // On Android 13+, this will trigger the system permission dialog
+          if (Notification.permission === 'granted') {
+            console.log('✅ Notification permission already granted (Mobile)');
+            return true;
+          }
+          
+          if (Notification.permission !== 'denied') {
+            try {
+              const permission = await Notification.requestPermission();
+              if (permission === 'granted') {
+                console.log('✅ Notification permission granted (Mobile)');
+                await this.registerDeviceToken(userId);
+                return true;
+              } else {
+                console.log('❌ Notification permission denied (Mobile)');
+                return false;
+              }
+            } catch (err) {
+              console.log('⚠️ Permission request not supported on this device');
+              // On some Android versions, permission is auto-granted via manifest
+              return true;
+            }
+          }
+        } else {
+          console.log('⚠️ Notification API not available, but manifest permissions should handle it');
+          // Even without web notification API, Android manifest permissions apply
+          return true;
+        }
+      }
+      
+      // Web/Browser notifications
       if (!('Notification' in window)) {
         console.log('This browser does not support notifications');
         return false;
@@ -381,7 +422,7 @@ class NotificationService {
 
       // Check if permission is already granted
       if (Notification.permission === 'granted') {
-        console.log('Notification permission already granted');
+        console.log('✅ Notification permission already granted (Web)');
         return true;
       }
 
@@ -389,10 +430,11 @@ class NotificationService {
       if (Notification.permission !== 'denied') {
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
-          console.log('Notification permission granted');
-          // Register device token if needed
+          console.log('✅ Notification permission granted (Web)');
           await this.registerDeviceToken(userId);
           return true;
+        } else {
+          console.log('❌ Notification permission denied (Web)');
         }
       }
 

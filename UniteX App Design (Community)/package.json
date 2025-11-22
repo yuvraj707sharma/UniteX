@@ -6,11 +6,18 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:prod": "vite build --config vite.config.optimized.ts",
     "build:check": "tsc && vite build",
+    "build:analyze": "vite build --config vite.config.optimized.ts && npx vite-bundle-visualizer",
     "preview": "vite preview",
     "android": "cap run android",
     "ios": "cap run ios",
-    "build:mobile": "npm run build && npx cap copy && npx cap sync"
+    "build:mobile": "npm run build && npx cap copy && npx cap sync",
+    "build:mobile:prod": "npm run build:prod && npx cap sync android",
+    "clean": "rm -rf dist build node_modules/.vite",
+    "clean:all": "npm run clean && rm -rf node_modules",
+    "sync": "npx cap sync",
+    "sync:android": "npx cap sync android"
   },
   "dependencies": {
     "@capacitor/android": "^6.0.0",
